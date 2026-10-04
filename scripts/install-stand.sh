@@ -174,8 +174,8 @@ cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
 [Unit]
 Description=АС «Скачки» — стенд ${STAND}
 Documentation=https://github.com/MrTimofeys/horse-racing-devops
-After=network-online.target
-$( [[ ${USE_POSTGRES} -eq 1 ]] && echo "Wants=postgresql.service" )
+After=network-online.target$( [[ ${USE_POSTGRES} -eq 1 ]] && printf ' postgresql.service' )
+Wants=network-online.target$( [[ ${USE_POSTGRES} -eq 1 ]] && printf ' postgresql.service' )
 
 [Service]
 Type=simple
@@ -219,7 +219,23 @@ systemctl --no-pager --lines=0 status "${SERVICE_NAME}" || true
 
 echo
 echo "==> Проверка работоспособности"
-curl -s "http://127.0.0.1:${PORT}/api/health" || echo "(служба ещё не отвечает — смотрите journalctl -u ${SERVICE_NAME})"
+HEALTH="$(curl -s "http://127.0.0.1:${PORT}/api/health" || true)"
+if [[ -z "${HEALTH}" ]]; then
+    echo "(служба ещё не отвечает — смотрите journalctl -u ${SERVICE_NAME})"
+else
+    echo "${HEALTH}"
+fi
+
+if [[ "${HEALTH}" == *'"degraded"'* ]]; then
+    cat <<WARN
+
+ВНИМАНИЕ: приложение запущено, но база данных недоступна.
+  Стенд продолжает отвечать на /api/health (status=degraded) и отдаёт страницу 503.
+  Проверьте службу СУБД и строку DATABASE_URL в ${APP_DIR}/.env.
+  Схема будет создана автоматически, как только СУБД станет доступна,
+  перезапуск службы не требуется.
+WARN
+fi
 
 cat <<EOF
 

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}База данных недоступна · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+  <div class="error-page__code">503</div>
+  <h1>База данных недоступна</h1>
+  <p>{{ message }}</p>
+
+  <p class="muted">
+    Стенд <strong>{{ settings.stand_label }}</strong> работает с СУБД:
+    <strong>{{ settings.dialect_label }}</strong>.
+  </p>
+
+  {% if detail %}
+  <p class="muted">
+    Сообщение СУБД: <code>{{ detail }}</code>
+  </p>
+  {% endif %}
+
+  <p class="muted">Порядок проверки на стенде:</p>
+  <ol class="muted">
+    <li>Убедиться, что служба СУБД запущена: <code>systemctl status postgresql</code></li>
+    <li>Проверить строку подключения в файле <code>/opt/horse-racing-devops/.env</code></li>
+    <li>Проверить подключение: <code>sudo -u skachki bash -c 'set -a; . /opt/horse-racing-devops/.env; set +a; /opt/horse-racing-devops/.venv/bin/python -m app.cli check'</code></li>
+    <li>Перезапустить службу приложения: <code>sudo systemctl restart skachki</code></li>
+  </ol>
+
+  <p class="muted">
+    Схема базы данных будет создана автоматически, как только СУБД станет доступна:
+    достаточно обновить эту страницу или обратиться к <code>/api/health</code>.
+  </p>
+
+  <a class="btn btn--primary" href="/api/health">Проверить состояние стенда</a>
+</div>
+{% endblock %}

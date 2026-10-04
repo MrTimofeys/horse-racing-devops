@@ -202,3 +202,37 @@ def bootstrap(db: Session) -> dict[str, object]:
         summary["demo_data"] = True
 
     return summary
+
+
+def prepare_stand() -> tuple[bool, str | None]:
+    """Подготовить стенд к работе: создать схему и начальные данные.
+
+    Возвращает пару ``(готовность, текст ошибки)``. Ошибка подключения к СУБД
+    не приводит к исключению: на стендах STAGE и PROD PostgreSQL может
+    запускаться позже приложения, и служба должна дождаться его, а не падать.
+    Повторная попытка выполняется при обращении к ``/api/health``.
+    """
+    from sqlalchemy.exc import InterfaceError, OperationalError
+
+    from .database import SessionLocal, init_db, mark_schema_ready, schema_ready
+
+    if schema_ready():
+        return True, None
+
+    try:
+        init_db()
+        with SessionLocal() as db:
+            summary = bootstrap(db)
+    except (OperationalError, InterfaceError) as exc:
+        return False, str(exc)
+
+    mark_schema_ready()
+
+    import logging
+
+    logging.getLogger("skachki").info(
+        "Схема БД готова. Новые учётные записи: %s. Демо-данные: %s",
+        ", ".join(summary["users_created"]) or "нет",  # type: ignore[arg-type]
+        "загружены" if summary["demo_data"] else "не загружались",
+    )
+    return True, None

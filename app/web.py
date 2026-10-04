@@ -94,3 +94,28 @@ def render(
 def redirect(url: str) -> RedirectResponse:
     """POST -> redirect -> GET (PRG), чтобы F5 не повторял отправку формы."""
     return RedirectResponse(url=url, status_code=303)
+
+
+def render_offline(
+    request: Request,
+    template: str,
+    *,
+    status_code: int = 503,
+    **context: Any,
+):
+    """Отрисовать страницу, не обращаясь к базе данных.
+
+    Используется, когда СУБД недоступна: обычный ``render`` пытается прочитать
+    сессию пользователя и упал бы повторно.
+    """
+    context.setdefault("user", None)
+    context.setdefault("current_path", request.url.path)
+    context["flashes"] = []
+    context["settings"] = get_settings()
+
+    return templates.TemplateResponse(
+        request=request,
+        name=template,
+        context=context,
+        status_code=status_code,
+    )

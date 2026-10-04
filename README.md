@@ -87,8 +87,17 @@ curl -s http://127.0.0.1:8080/api/health
 ```
 
 ```json
-{"status":"ok","stand":"TEST","database":{"dialect":"SQLite","available":true}}
+{"status":"ok","stand":"TEST","database":{"dialect":"SQLite","available":true,"schema_ready":true}}
 ```
+
+Если СУБД недоступна, стенд всё равно поднимается и честно об этом сообщает:
+
+```json
+{"status":"degraded","stand":"STAGE","database":{"dialect":"PostgreSQL","available":false,"schema_ready":false,"error":"..."}}
+```
+
+Страницы при этом отдают `503` с перечнем того, что нужно проверить, а схема
+создастся сама, как только СУБД станет доступна — перезапуск службы не нужен.
 
 ## Демонстрационные учётные записи
 
@@ -175,13 +184,14 @@ python -m app.cli seed --demo
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                              # 131 тест
+pytest                              # 139 тестов
 pytest --cov=app --cov-report=term-missing
 ```
 
 Тесты используют отдельную базу `instance/test_skachki.db` и не затрагивают
 рабочие данные. Покрыто: авторизация и права ролей, все семь функций ТЗ,
-валидация форм, ограничения целостности, разбор показанного времени, JSON-API.
+валидация форм, ограничения целостности, разбор показанного времени, JSON-API,
+а также поведение стенда при недоступной СУБД (`tests/test_availability.py`).
 
 ## JSON-API
 
@@ -214,7 +224,7 @@ horse-racing-devops/
 │   ├── routers/           # маршруты: авторизация, справочники, состязания, API
 │   ├── templates/         # HTML-шаблоны интерфейса на русском языке
 │   └── static/css/        # оформление
-├── tests/                 # pytest: 131 тест
+├── tests/                 # pytest: 139 тестов
 ├── scripts/               # скрипты развёртывания и обслуживания стендов (ЛР 2)
 ├── docs/                  # архитектура и инструкция по развёртыванию
 ├── requirements.txt

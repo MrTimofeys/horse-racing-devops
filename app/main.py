@@ -17,14 +17,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__, seed
 from .config import get_settings
-from .database import SessionLocal, init_db
+from .database import SessionLocal
 from .deps import Forbidden, LoginRequired
 from .routers import all_routers
-from .web import STATIC_DIR, render
+from .web import STATIC_DIR, render, render_offline
 
 settings = get_settings()
 
@@ -37,18 +38,30 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Создать схему БД и наполнить её начальными данными при старте стенда."""
-    init_db()
-    with SessionLocal() as db:
-        summary = seed.bootstrap(db)
+    """Создать схему БД и наполнить её начальными данными при старте стенда.
 
-    logger.info(
-        "Стенд %s запущен. СУБД: %s. Новые учётные записи: %s. Демо-данные: %s",
-        settings.stand_label,
-        settings.dialect_label,
-        ", ".join(summary["users_created"]) or "нет",
-        "загружены" if summary["demo_data"] else "не загружались",
-    )
+    Недоступность СУБД не останавливает приложение: служба поднимается и
+    сообщает о проблеме через ``/api/health`` и страницу 503. Это важно для
+    стендов STAGE и PROD, где PostgreSQL может запускаться позже приложения.
+    """
+    ready, error = seed.prepare_stand()
+
+    if ready:
+        logger.info(
+            "Стенд %s запущен. СУБД: %s.",
+            settings.stand_label,
+            settings.dialect_label,
+        )
+    else:
+        logger.error(
+            "Стенд %s запущен БЕЗ базы данных: %s\n"
+            "        Приложение отвечает на /api/health (status=degraded) и отдаёт страницу 503.\n"
+            "        Проверьте службу СУБД и строку DATABASE_URL, затем обратитесь к /api/health —\n"
+            "        схема будет создана автоматически, как только СУБД станет доступна.",
+            settings.stand_label,
+            error,
+        )
+
     yield
     logger.info("Стенд %s остановлен", settings.stand_label)
 
@@ -113,17 +126,44 @@ async def handle_http_exception(request: Request, exc: StarletteHTTPException):
         )
 
 
+@app.exception_handler(OperationalError)
+@app.exception_handler(InterfaceError)
+async def handle_database_unavailable(request: Request, exc: Exception):
+    """СУБД недоступна: отдаём 503 и понятную инструкцию, а не 500 со стеком.
+
+    Обработчик намеренно не обращается к базе (в отличие от остальных страниц
+    ошибок), иначе он бы упал повторно. Попутно даём СУБД шанс подняться.
+    """
+    logger.error("СУБД недоступна при обработке %s: %s", request.url.path, exc)
+
+    ready, _ = seed.prepare_stand()
+    if ready:
+        return RedirectResponse(url=request.url.path, status_code=303)
+
+    if _wants_json(request):
+        return JSONResponse(
+            {"detail": "База данных недоступна", "database": {"available": False}},
+            status_code=503,
+        )
+
+    return render_offline(
+        request,
+        "errors/503.html",
+        status_code=503,
+        message="База данных недоступна. Проверьте, что служба СУБД запущена, и повторите попытку.",
+        detail=str(exc).splitlines()[0] if str(exc) else None,
+    )
+
+
 @app.exception_handler(Exception)
 async def handle_unexpected(request: Request, exc: Exception):
     logger.exception("Необработанная ошибка при обработке %s", request.url.path)
     if _wants_json(request):
         return JSONResponse({"detail": "Внутренняя ошибка сервера"}, status_code=500)
-    with SessionLocal() as db:
-        return render(
-            request,
-            db,
-            "errors/500.html",
-            message="Внутренняя ошибка сервера. Подробности записаны в журнал приложения.",
-            code=500,
-            status_code=500,
-        )
+
+    message = "Внутренняя ошибка сервера. Подробности записаны в журнал приложения."
+    try:
+        with SessionLocal() as db:
+            return render(request, db, "errors/500.html", message=message, code=500, status_code=500)
+    except Exception:  # noqa: BLE001 — отрисовать страницу без обращения к БД
+        return render_offline(request, "errors/500.html", status_code=500, message=message, code=500)

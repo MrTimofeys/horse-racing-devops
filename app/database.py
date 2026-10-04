@@ -90,6 +90,26 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
 
 
+# --- Состояние готовности схемы -------------------------------------------
+#
+# На стендах STAGE и PROD приложение работает с PostgreSQL, который может
+# подниматься дольше, чем служба приложения. Поэтому факт успешного создания
+# схемы запоминается: если СУБД была недоступна при старте, схема будет
+# создана при первой удачной проверке работоспособности (см. /api/health).
+
+_schema_ready = False
+
+
+def schema_ready() -> bool:
+    """True, если схема БД успешно создана в текущем процессе."""
+    return _schema_ready
+
+
+def mark_schema_ready() -> None:
+    global _schema_ready
+    _schema_ready = True
+
+
 def drop_db() -> None:
     """Удалить все таблицы (используется в тестах и при сбросе стенда)."""
     from . import models  # noqa: F401

@@ -265,7 +265,7 @@ sudo -u skachki ./.venv/bin/python -m pytest -q
   "application": "АС «Скачки»",
   "version": "1.0.0",
   "stand": "TEST",
-  "database": { "dialect": "SQLite", "available": true, "error": null }
+  "database": { "dialect": "SQLite", "available": true, "schema_ready": true, "error": null }
 }
 ```
 
@@ -327,9 +327,15 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 | Приложение не отвечает на `127.0.0.1:8080` | `sudo journalctl -u skachki -n 50`. Типичная причина — ошибка в `.env` |
 | Приложение отвечает локально, но не с других ВМ | Проверьте `APP_HOST=0.0.0.0` в `/opt/horse-racing-devops/.env` и `sudo ss -tlnp \| grep 8080` |
 | `ModuleNotFoundError` при старте | Виртуальное окружение не собрано: `sudo -u skachki /opt/horse-racing-devops/.venv/bin/pip install -r /opt/horse-racing-devops/requirements.txt` |
+| `curl /api/health` → `"status":"degraded"`, страницы отдают `503` | Служба работает, а СУБД — нет. Это штатное поведение: запустите PostgreSQL (`sudo systemctl start postgresql`) и **обновите страницу** — схема создастся сама, перезапуск `skachki` не нужен |
 | PostgreSQL: `connection refused` | `sudo systemctl status postgresql`; проверьте `DATABASE_URL` в `.env` |
 | Порт занят | `sudo ss -tlnp \| grep 8080`, затем `sudo bash scripts/install-stand.sh test --port 8081` |
 | Не хватает памяти на три ВМ | Уменьшите RAM каждой ВМ до 1.5 ГБ или запускайте по две одновременно |
+
+> **Полезно знать.** Приложение намеренно не падает при недоступной СУБД: стенд
+> поднимается, `/api/health` отдаёт `status=degraded`, а страницы — `503` с
+> перечнем того, что нужно проверить. Поэтому при защите работы можно показать
+> поведение стенда при отказе базы: остановите PostgreSQL и обновите страницу.
 
 ---
 

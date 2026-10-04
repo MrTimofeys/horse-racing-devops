@@ -13,9 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .. import __version__, crud
+from .. import __version__, crud, seed
 from ..config import get_settings
-from ..database import get_db
+from ..database import get_db, schema_ready
 from ..deps import require_user
 from ..models import Hippodrome, Horse, Jockey, Owner, Race, RaceResult, User
 
@@ -102,7 +102,12 @@ def race_json(race: Race, *, with_participants: bool = False) -> dict:
 
 @router.get("/health", summary="Проверка работоспособности стенда (без авторизации)")
 def health(db: Session = Depends(get_db)):
-    """Эндпоинт для мониторинга: отвечает всегда, даже если БД недоступна."""
+    """Эндпоинт для мониторинга: отвечает всегда, даже если БД недоступна.
+
+    Если СУБД поднялась позже приложения (обычная ситуация на стендах STAGE и
+    PROD при загрузке системы), схема создаётся прямо здесь — службе не нужен
+    перезапуск.
+    """
     database_ok = True
     database_error = None
     try:
@@ -111,12 +116,24 @@ def health(db: Session = Depends(get_db)):
         database_ok = False
         database_error = str(exc)
 
+    ready = schema_ready()
+    if database_ok and not ready:
+        ready, prepare_error = seed.prepare_stand()
+        if not ready:
+            database_ok = False
+            database_error = prepare_error
+
     return {
-        "status": "ok" if database_ok else "degraded",
+        "status": "ok" if (database_ok and ready) else "degraded",
         "application": settings.app_name,
         "version": __version__,
         "stand": settings.stand_label,
-        "database": {"dialect": settings.dialect_label, "available": database_ok, "error": database_error},
+        "database": {
+            "dialect": settings.dialect_label,
+            "available": database_ok,
+            "schema_ready": ready,
+            "error": database_error,
+        },
         "time": datetime.now(timezone.utc).isoformat(),
     }
 
