@@ -216,9 +216,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from sqlalchemy.exc import InterfaceError, OperationalError
+
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (OperationalError, InterfaceError) as exc:
+        # Понятное сообщение вместо трассировки: команда может вызываться из
+        # скриптов развёртывания стендов (ЛР 2), где трассировка только мешает.
+        print(f"База данных недоступна: {str(exc).splitlines()[0]}", file=sys.stderr)
+        print(
+            "Проверьте, что служба СУБД запущена, и строку DATABASE_URL.",
+            file=sys.stderr,
+        )
+        return 1
 
 
 if __name__ == "__main__":

@@ -208,6 +208,20 @@ sudo bash scripts/provision-ubuntu.sh --with-postgres
 `build-essential`, `libpq-dev`, `rsync`, `sqlite3`, `iputils-ping` и печатает
 версии установленных средств — это и есть доказательство для пункта 5 отчёта.
 
+> **Можно проверить заранее, не создавая ВМ.** Скрипт развёртывания умеет
+> исполняться в песочнице с заглушками системных утилит — на любой машине с
+> Python и Git:
+>
+> ```bash
+> bash scripts/check-deploy.sh test                  # 24 проверки
+> bash scripts/check-deploy.sh stage --with-postgres # 18 проверок
+> bash scripts/check-deploy.sh prod                  # 25 проверок
+> ```
+>
+> Проверяется, что создаются рабочий файл `.env`, виртуальное окружение с
+> зависимостями, база данных и юнит systemd, а приложение из развёрнутого
+> каталога действительно отвечает на `/api/health` и пускает `admin`.
+
 ### Вариант Б — вручную (для скриншотов в отчёте)
 
 ```bash

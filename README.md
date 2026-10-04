@@ -252,6 +252,15 @@ sudo bash scripts/install-stand.sh test    # или stage / prod
 curl -s http://127.0.0.1:8080/api/health
 ```
 
+Скрипты развёртывания можно проверить и **без виртуальной машины** — они
+исполняются в песочнице с заглушками системных утилит:
+
+```bash
+bash scripts/check-deploy.sh test                 # 24 проверки
+bash scripts/check-deploy.sh stage --with-postgres
+bash scripts/check-deploy.sh prod
+```
+
 ## Модель данных
 
 ```

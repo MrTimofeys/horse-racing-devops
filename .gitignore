@@ -33,6 +33,9 @@ backups/
 *.dump
 *.sql.gz
 
+# --- Песочница самопроверки scripts/check-deploy.sh ---
+.deploy-selftest/
+
 # --- Редакторы и ОС ---
 .idea/
 .vscode/

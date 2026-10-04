@@ -25,8 +25,22 @@ fi
 NAMES=(test stage prod)
 PORT="${APP_PORT:-8080}"
 
-printf '%-8s %-16s %-12s %-30s %s\n' "СТЕНД" "АДРЕС" "PING" "ПРИЛОЖЕНИЕ" "ОТВЕТ"
-printf '%s\n' "--------------------------------------------------------------------------------------"
+# printf в bash считает ширину поля в байтах, поэтому для кириллицы колонки
+# разъезжаются. Считаем длину в символах и дополняем пробелами вручную.
+pad() {
+    local text="$1" width="$2" length
+    length="$(printf '%s' "${text}" | wc -m | tr -d ' ')"
+    printf '%s' "${text}"
+    while ((length < width)); do
+        printf ' '
+        length=$((length + 1))
+    done
+}
+
+W_NAME=6 W_HOST=16 W_PING=12 W_APP=14
+
+echo "$(pad 'СТЕНД' ${W_NAME}) $(pad 'АДРЕС' ${W_HOST}) $(pad 'PING' ${W_PING}) $(pad 'ПРИЛОЖЕНИЕ' ${W_APP}) ОТВЕТ"
+printf '%s\n' "-------------------------------------------------------------------------------------------"
 
 FAILED=0
 
@@ -45,17 +59,17 @@ for i in "${!HOSTS[@]}"; do
         app_state="отвечает"
     else
         app_state="НЕ ОТВЕЧАЕТ"
-        body=""
+        body="—"
         FAILED=1
     fi
 
-    printf '%-8s %-16s %-12s %-30s %s\n' "${name}" "${host}" "${ping_state}" "${app_state}" "${body}"
+    echo "$(pad "${name}" ${W_NAME}) $(pad "${host}" ${W_HOST}) $(pad "${ping_state}" ${W_PING}) $(pad "${app_state}" ${W_APP}) ${body}"
 done
 
 echo
 echo "Матрица связности «от всех ко всем» (ping):"
 for from in "${HOSTS[@]}"; do
-    printf '  %-16s -> ' "${from}"
+    printf '  %s -> ' "$(pad "${from}" 16)"
     for to in "${HOSTS[@]}"; do
         if ping -c 1 -W 2 "${to}" >/dev/null 2>&1; then
             printf 'ok '

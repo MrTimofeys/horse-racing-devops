@@ -16,11 +16,14 @@
 #
 set -euo pipefail
 
-SERVICE_NAME="skachki"
-APP_USER="skachki"
-APP_DIR="/opt/horse-racing-devops"
-DB_NAME="skachki"
-DB_USER="skachki"
+SERVICE_NAME="${SERVICE_NAME:-skachki}"
+# Значения можно переопределить переменными окружения — это используется при
+# проверке самого скрипта и при нестандартной раскладке каталогов на стенде.
+APP_USER="${APP_USER:-skachki}"
+APP_DIR="${APP_DIR:-/opt/horse-racing-devops}"
+SERVICE_DIR="${SERVICE_DIR:-/etc/systemd/system}"
+DB_NAME="${DB_NAME:-skachki}"
+DB_USER="${DB_USER:-skachki}"
 
 STAND=""
 PORT=""
@@ -67,7 +70,7 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PORT="${PORT:-8080}"
 
 # Стенд PROD по умолчанию разворачивается без демонстрационных данных.
@@ -159,6 +162,9 @@ chmod 640 "${APP_DIR}/.env"
 chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 
 # --- 6. Инициализация базы ------------------------------------------------
+# Сбой на этом шаге не прерывает развёртывание: приложение умеет работать без
+# базы (отдаёт status=degraded и страницу 503) и создаёт схему самостоятельно,
+# как только СУБД станет доступна. Иначе стенд остался бы вообще без службы.
 echo "==> Инициализация базы данных"
 if [[ "${SEED_DEMO}" -eq 1 ]]; then
     SEED_ARGS="seed --demo"
@@ -166,11 +172,21 @@ else
     SEED_ARGS="seed"
 fi
 
-sudo -u "${APP_USER}" bash -c "cd '${APP_DIR}' && set -a && . ./.env && set +a && ./.venv/bin/python -m app.cli init-db && ./.venv/bin/python -m app.cli ${SEED_ARGS}"
+mkdir -p "${APP_DIR}/instance"
+INIT_LOG="${APP_DIR}/instance/install.log"
+
+if sudo -u "${APP_USER}" bash -c "cd '${APP_DIR}' && set -a && . ./.env && set +a && ./.venv/bin/python -m app.cli init-db && ./.venv/bin/python -m app.cli ${SEED_ARGS}" >"${INIT_LOG}" 2>&1; then
+    echo "    Схема создана, начальные данные загружены."
+    DATABASE_PREPARED=1
+else
+    DATABASE_PREPARED=0
+    echo "    ВНИМАНИЕ: не удалось подготовить базу данных."
+    tail -n 2 "${INIT_LOG}" | sed 's/^/      /'
+fi
 
 # --- 7. Служба systemd ----------------------------------------------------
 echo "==> Регистрация службы ${SERVICE_NAME}.service"
-cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
+cat > "${SERVICE_DIR}/${SERVICE_NAME}.service" <<UNIT
 [Unit]
 Description=АС «Скачки» — стенд ${STAND}
 Documentation=https://github.com/MrTimofeys/horse-racing-devops
@@ -226,11 +242,12 @@ else
     echo "${HEALTH}"
 fi
 
-if [[ "${HEALTH}" == *'"degraded"'* ]]; then
+if [[ "${HEALTH}" == *'"degraded"'* || "${DATABASE_PREPARED:-1}" -eq 0 ]]; then
     cat <<WARN
 
-ВНИМАНИЕ: приложение запущено, но база данных недоступна.
-  Стенд продолжает отвечать на /api/health (status=degraded) и отдаёт страницу 503.
+ВНИМАНИЕ: база данных недоступна.
+  Стенд развёрнут, служба ${SERVICE_NAME} зарегистрирована и запущена.
+  Приложение отвечает на /api/health (status=degraded) и отдаёт страницу 503.
   Проверьте службу СУБД и строку DATABASE_URL в ${APP_DIR}/.env.
   Схема будет создана автоматически, как только СУБД станет доступна,
   перезапуск службы не требуется.

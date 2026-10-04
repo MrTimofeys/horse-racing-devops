@@ -16,7 +16,7 @@ HOST   ?= 127.0.0.1
 PORT   ?= 8080
 
 .PHONY: help venv install dev run test test-cov seed reset check stats info \
-        install-stand provision backup clean docker-build
+        install-stand provision backup check-deploy check-stands clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -65,6 +65,12 @@ install-stand:  ## развернуть стенд как службу systemd: 
 backup:  ## создать резервную копию базы данных
 	bash scripts/backup.sh
 
+check-deploy:  ## проверить скрипты развёртывания без виртуальной машины: make check-deploy STAND=test
+	bash scripts/check-deploy.sh $(STAND)
+
+check-stands:  ## проверить связность стендов TEST/STAGE/PROD по сети
+	bash scripts/check-stands.sh
+
 clean:  ## удалить временные файлы и кеши
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
-	rm -rf .pytest_cache .coverage htmlcov
+	rm -rf .pytest_cache .coverage htmlcov .deploy-selftest
