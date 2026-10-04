@@ -355,25 +355,62 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 
 ## Чеклист скриншотов для отчёта
 
-| № | Что снять | Как получить |
-|---|----------|--------------|
-| 1 | Гипервизор с тремя ВМ | Окно Parallels Control Center со списком `skachki-test`, `skachki-stage`, `skachki-prod` |
-| 2 | Версия ОС на каждой ВМ | `hostname && lsb_release -a && uname -m` |
-| 3 | Настройки сети ВМ | Parallels → Configure → Hardware → Network (Shared Network) |
-| 4 | Статические адреса | `ip -brief address` на каждой ВМ |
-| 5 | Связность «от всех ко всем» | `bash scripts/check-stands.sh 10.211.55.11 .12 .13` — матрица `ok`, а также ручные `ping` между парами ВМ |
-| 6 | Клонирование репозитория | `git clone …`, `git log --oneline -1`, `ls` |
-| 7 | Установка средств разработки | Вывод `scripts/provision-ubuntu.sh`: версии Python, pip, Git, gcc |
-| 8 | Развёртывание приложения | Вывод `scripts/install-stand.sh test` |
-| 9 | Служба запущена | `systemctl status skachki` |
-| 10 | Стенд отвечает | `curl -s http://127.0.0.1:8080/api/health` на каждой ВМ |
-| 11 | Доступ с других машин | `curl -s http://10.211.55.11:8080/api/health` с ВМ stage/prod |
-| 12 | Тесты проходят | `pytest -q` в `/opt/horse-racing-devops` |
-| 13 | Интерфейс приложения | Страницы входа, главная с именем стенда, список состязаний, карточка заезда с местами и временем |
-| 14 | Разграничение прав | Вид интерфейса под `admin`, `operator`, `viewer` |
-| 15 | Работа функций ТЗ | Добавление жокея, лошади, состязания и внесение результата |
-| 16 | Резервное копирование | `scripts/backup.sh` и список файлов в `backups/` |
-| 17 | Поведение при отказе СУБД (по желанию) | `sudo systemctl stop postgresql` → `curl /api/health` покажет `degraded`, страница отдаст `503`; затем `sudo systemctl start postgresql` и обновление страницы без перезапуска `skachki` |
+В отчёте 40 рисунков. Ниже указано, что снять для каждого из них и на какой машине.
+Снимайте по порядку — тогда нумерация совпадёт с порядком рисунков в отчёте.
+
+«macOS» — снимок экрана хостовой машины, «браузер» — страница приложения,
+открытая в браузере на macOS по адресу стенда.
+
+| № | Где | Что снять |
+|---|-----|-----------|
+| 1 | macOS | Окно Parallels Desktop со списком `skachki-test`, `skachki-stage`, `skachki-prod` |
+| 2 | TEST | `hostname && lsb_release -a && uname -m` |
+| 3 | STAGE | `hostname && lsb_release -a && uname -m` |
+| 4 | PROD | `hostname && lsb_release -a && uname -m` |
+| 5 | macOS | Parallels → Configure → Hardware → Network (режим Shared Network) |
+| 6 | TEST | `ip -brief address` |
+| 7 | STAGE | `ip -brief address` |
+| 8 | PROD | `ip -brief address` |
+| 9 | TEST, STAGE | `ping -c 3 10.211.55.12` и `ping -c 3 10.211.55.13` (два окна рядом) |
+| 10 | PROD | `ping -c 3 10.211.55.11` и `ping -c 3 10.211.55.12` |
+| 11 | любая | `bash scripts/check-stands.sh` — матрица связности |
+| 12 | TEST | `git clone https://github.com/MrTimofeys/horse-racing-devops.git` |
+| 13 | TEST | `git log --oneline -3 && git remote -v` |
+| 14 | TEST | `ls -la` |
+| 15 | TEST | `sudo bash scripts/provision-ubuntu.sh` (конец вывода) |
+| 16 | TEST | `python3 --version; pip3 --version; git --version; gcc --version` |
+| 17 | TEST | `sudo bash scripts/install-stand.sh test` |
+| 18 | STAGE | `sudo bash scripts/provision-ubuntu.sh --with-postgres`, затем `sudo bash scripts/install-stand.sh stage --with-postgres` |
+| 19 | PROD | `sudo bash scripts/provision-ubuntu.sh --with-postgres`, затем `sudo bash scripts/install-stand.sh prod --with-postgres` |
+| 20 | любая | `systemctl status skachki --no-pager` |
+| 21 | TEST | `curl -s http://127.0.0.1:8080/api/health \| python3 -m json.tool` |
+| 22 | STAGE | `curl -s http://127.0.0.1:8080/api/health \| python3 -m json.tool` |
+| 23 | PROD | `curl -s http://127.0.0.1:8080/api/health \| python3 -m json.tool` |
+| 24 | STAGE или PROD | `curl -s http://10.211.55.11:8080/api/health` — обращение к стенду TEST с другой машины |
+| 25 | TEST | `cd /opt/horse-racing-devops && sudo -u skachki ./.venv/bin/python -m pytest -q` |
+| 26 | браузер | `http://10.211.55.11:8080/login` — страница входа |
+| 27 | браузер | Главная страница стенда TEST под `admin` (видно имя стенда) |
+| 28 | браузер | `http://10.211.55.11:8080/races` — список состязаний с фильтрами |
+| 29 | браузер | Карточка состязания: состав заезда, места и показанное время |
+| 30 | браузер | Форма добавления нового состязания |
+| 31 | браузер | Внесение результата заезда |
+| 32 | браузер | Карточка жокея с историей участия |
+| 33 | браузер | Карточка лошади с историей участия |
+| 34 | браузер | Вход под `viewer`: кнопки изменения данных недоступны |
+| 35 | браузер | Главная страница стенда STAGE (`http://10.211.55.12:8080`) |
+| 36 | браузер | Главная страница стенда PROD (`http://10.211.55.13:8080`) |
+| 37 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh` и `ls -lh /opt/horse-racing-devops/backups/` |
+| 38 | STAGE | `sudo systemctl stop postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — `status: degraded` |
+| 39 | браузер | `http://10.211.55.12:8080/races` — страница 503 с объяснением |
+| 40 | STAGE | `sudo systemctl start postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — снова `status: ok` |
+
+Рисунки 38–40 относятся к проверке поведения при отказе СУБД. Она не входит в
+обязательное задание, но показывает устойчивость стенда и хорошо смотрится при
+защите: после запуска PostgreSQL стенд восстанавливается **без перезапуска службы
+`skachki`**.
+
+> Перед снимком 25 скопируйте в отчёт вывод тестов целиком: строка вида
+> `139 passed` — доказательство, что функции ТЗ работают.
 
 ---
 
