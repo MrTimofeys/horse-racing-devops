@@ -287,9 +287,9 @@ curl -s http://127.0.0.1:8080/api/health
 исполняются в песочнице с заглушками системных утилит:
 
 ```bash
-bash scripts/check-deploy.sh test                 # 25 проверок
-bash scripts/check-deploy.sh stage --with-postgres
-bash scripts/check-deploy.sh prod
+bash scripts/check-deploy.sh test                  # 25 проверок
+bash scripts/check-deploy.sh stage --with-postgres # 18 проверок
+bash scripts/check-deploy.sh prod --with-postgres  # 19 проверок
 ```
 
 ## Модель данных

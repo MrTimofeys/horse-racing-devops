@@ -89,8 +89,8 @@ jobs:
       - name: Стенд STAGE (PostgreSQL)
         run: bash scripts/check-deploy.sh stage --with-postgres
 
-      - name: Стенд PROD (SQLite)
-        run: bash scripts/check-deploy.sh prod
+      - name: Стенд PROD (PostgreSQL)
+        run: bash scripts/check-deploy.sh prod --with-postgres
 
       - name: Синтаксис служебных скриптов
         run: |
