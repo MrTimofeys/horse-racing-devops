@@ -57,9 +57,6 @@ cleanup() {
     if [[ -f "${WORK_DIR}/stand.pid" ]]; then
         kill "$(cat "${WORK_DIR}/stand.pid")" 2>/dev/null
     fi
-    if [[ -f "${WORK_DIR}/stand_port.pid" ]]; then
-        kill "$(cat "${WORK_DIR}/stand_port.pid")" 2>/dev/null
-    fi
 }
 trap cleanup EXIT
 
@@ -221,6 +218,7 @@ else
     HEALTH="$(curl -s --max-time 5 "http://127.0.0.1:${PORT}/api/health" 2>/dev/null || true)"
     echo "  ответ /api/health: ${HEALTH}"
 
+    check "процесс приложения запущен" "kill -0 \$(cat '${WORK_DIR}/stand.pid')"
     check "приложение отвечает на /api/health" "[[ -n '${HEALTH}' ]]"
     check "статус стенда — ok" "[[ '${HEALTH}' == *'\"status\":\"ok\"'* ]]"
     check "имя стенда в ответе — ${STAND_UPPER}" "[[ '${HEALTH}' == *'\"stand\":\"${STAND_UPPER}\"'* ]]"

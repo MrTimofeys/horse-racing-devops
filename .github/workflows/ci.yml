@@ -1,0 +1,100 @@
+name: Проверка проекта
+
+# Автоматическая проверка при каждом изменении в репозитории.
+# Набор тестов выполняется на обеих поддерживаемых СУБД, чтобы стенды TEST
+# (SQLite) и STAGE/PROD (PostgreSQL) не разошлись в поведении.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests-sqlite:
+    name: Тесты на SQLite (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Установка зависимостей
+        run: pip install -r requirements-dev.txt
+
+      - name: Версии установленных средств
+        run: |
+          python --version
+          pip --version
+
+      - name: Тесты
+        run: pytest -q
+
+  tests-postgresql:
+    name: Тесты на PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skachki
+          POSTGRES_PASSWORD: skachki
+          POSTGRES_DB: skachki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://skachki:skachki@127.0.0.1:5432/skachki_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Установка зависимостей
+        run: pip install -r requirements-dev.txt -r requirements-postgres.txt
+
+      - name: Тесты
+        run: pytest -q
+
+  deploy-scripts:
+    name: Самопроверка скриптов развёртывания
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # check-deploy.sh сам создаёт виртуальное окружение и ставит зависимости,
+      # поэтому отдельная установка не нужна.
+      - name: Стенд TEST (SQLite)
+        run: bash scripts/check-deploy.sh test
+
+      - name: Стенд STAGE (PostgreSQL)
+        run: bash scripts/check-deploy.sh stage --with-postgres
+
+      - name: Стенд PROD (SQLite)
+        run: bash scripts/check-deploy.sh prod
+
+      - name: Синтаксис служебных скриптов
+        run: |
+          for script in scripts/*.sh; do
+            echo "проверка $script"
+            bash -n "$script"
+          done

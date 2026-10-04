@@ -213,9 +213,9 @@ sudo bash scripts/provision-ubuntu.sh --with-postgres
 > Python и Git:
 >
 > ```bash
-> bash scripts/check-deploy.sh test                  # 24 проверки
+> bash scripts/check-deploy.sh test                  # 25 проверок
 > bash scripts/check-deploy.sh stage --with-postgres # 18 проверок
-> bash scripts/check-deploy.sh prod                  # 25 проверок
+> bash scripts/check-deploy.sh prod                  # 26 проверок
 > ```
 >
 > Проверяется, что создаются рабочий файл `.env`, виртуальное окружение с

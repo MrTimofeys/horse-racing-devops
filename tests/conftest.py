@@ -23,9 +23,12 @@ TEST_DB_PATH = ROOT / "instance" / "test_skachki.db"
 #
 #   DATABASE_URL="postgresql+psycopg://... " pytest
 #
-EXTERNAL_DATABASE_URL = os.environ.get("DATABASE_URL")
+EXTERNAL_DATABASE_URL = os.environ.get("DATABASE_URL") or None
 
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DB_PATH}")
+if not EXTERNAL_DATABASE_URL:
+    # Присваиваем, а не setdefault: пустая строка в DATABASE_URL тоже должна
+    # означать «использовать SQLite», а setdefault её бы не тронул.
+    os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 os.environ["STAND_NAME"] = "test"
 os.environ["AUTO_SEED"] = "true"
 os.environ["SEED_DEMO_DATA"] = "true"
