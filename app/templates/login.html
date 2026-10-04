@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Вход в систему · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+  <form class="card login-card" method="post" action="/login">
+    <h1 class="login-card__title">Вход в систему</h1>
+    <p class="login-card__subtitle">{{ settings.app_name }}</p>
+
+    {% if error %}
+      <div class="flash flash--error">{{ error }}</div>
+    {% endif %}
+
+    <label class="field">
+      <span class="field__label">Логин</span>
+      <input class="field__input" type="text" name="username" value="{{ username }}"
+             autocomplete="username" autofocus required>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Пароль</span>
+      {# ТЗ: «слепые» пароли — символы не показываются на экране #}
+      <input class="field__input" type="password" name="password"
+             autocomplete="current-password" required>
+    </label>
+
+    <button type="submit" class="btn btn--primary btn--block">Войти</button>
+
+    {% if demo_hint %}
+      <div class="login-card__hint">
+        <strong>Демонстрационные учётные записи</strong>
+        <ul>
+          <li><code>admin</code> / <code>admin123</code> — администратор (полный доступ)</li>
+          <li><code>operator</code> / <code>operator123</code> — оператор (ввод данных)</li>
+          <li><code>viewer</code> / <code>viewer123</code> — наблюдатель (только просмотр)</li>
+        </ul>
+        <p class="muted">На стенде PROD пароли меняются, подсказка отключается
+          переменной <code>DEMO_LOGIN_HINT=false</code>.</p>
+      </div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

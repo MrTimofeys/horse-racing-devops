@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Ошибка {{ code }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+  <div class="error-page__code">{{ code }}</div>
+  <h1>Не удалось выполнить запрос</h1>
+  <p>{{ message }}</p>
+  <a class="btn btn--primary" href="/dashboard">На главную</a>
+</div>
+{% endblock %}

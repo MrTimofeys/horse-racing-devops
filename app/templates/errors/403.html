@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Доступ запрещён · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+  <div class="error-page__code">{{ code or 403 }}</div>
+  <h1>Доступ запрещён</h1>
+  <p>{{ message }}</p>
+  <p class="muted">
+    Ваша роль — <strong>{{ user.role_label if user else 'гость' }}</strong>.
+    Для выполнения этой операции обратитесь к администратору системы.
+  </p>
+  <a class="btn btn--primary" href="/dashboard">На главную</a>
+</div>
+{% endblock %}

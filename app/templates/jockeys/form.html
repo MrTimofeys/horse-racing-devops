@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение жокея' if jockey else 'Новый жокей' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение жокея' if jockey else 'Новый жокей' }}</h1>
+  <a class="btn btn--ghost" href="{{ '/jockeys/' ~ jockey.id if jockey else '/jockeys' }}">← Назад</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/jockeys/' ~ jockey.id ~ '/edit' if jockey else '/jockeys/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Имя жокея <span class="req">*</span></span>
+    <input class="field__input" type="text" name="name" value="{{ data.name }}" maxlength="128" required>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Адрес</span>
+    <input class="field__input" type="text" name="address" value="{{ data.address }}" maxlength="255">
+  </label>
+
+  <div class="form__row">
+    <label class="field">
+      <span class="field__label">Возраст, лет <span class="req">*</span></span>
+      <input class="field__input" type="number" name="age" value="{{ data.age }}" min="16" max="99" required>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Рейтинг</span>
+      <input class="field__input" type="number" name="rating" value="{{ data.rating }}" min="0" max="1000">
+      <span class="field__help">Целое число от 0 до 1000.</span>
+    </label>
+  </div>
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="{{ '/jockeys/' ~ jockey.id if jockey else '/jockeys' }}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

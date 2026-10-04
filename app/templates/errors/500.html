@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Ошибка сервера · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+  <div class="error-page__code">500</div>
+  <h1>Внутренняя ошибка сервера</h1>
+  <p>{{ message }}</p>
+  <p class="muted">
+    Журнал приложения на стенде <strong>{{ settings.stand_label }}</strong>:
+    <code>journalctl -u skachki -n 50</code> или <code>tail -n 50 logs/app.log</code>.
+  </p>
+  <a class="btn btn--primary" href="/dashboard">На главную</a>
+</div>
+{% endblock %}

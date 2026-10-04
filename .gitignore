@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Виртуальные окружения ---
+.venv/
+venv/
+env/
+
+# --- Переменные окружения стендов (в репозитории только .env.example) ---
+.env
+.env.*
+!.env.example
+
+# --- Данные приложения ---
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Тесты ---
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Резервные копии, создаваемые scripts/backup.sh ---
+backups/
+*.dump
+*.sql.gz
+
+# --- Редакторы и ОС ---
+.idea/
+.vscode/
+*.swp
+.DS_Store

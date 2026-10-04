@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pagination %}
+{% block title %}Состязания · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>Состязания</h1>
+    <p class="muted">Дата, время, ипподром, название, состав заезда и результаты.</p>
+  </div>
+  {% if user.can_edit %}
+    <a class="btn btn--primary" href="/races/new">+ Добавить состязание</a>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/races">
+  <input class="field__input" type="search" name="search" value="{{ search }}" placeholder="Поиск по названию или ипподрому">
+  <select class="field__input field__input--select" name="status">
+    <option value="">Все статусы</option>
+    {% for value in RACE_STATUSES %}
+      <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ RACE_STATUS_LABELS[value] }}</option>
+    {% endfor %}
+  </select>
+  <select class="field__input field__input--select" name="hippodrome_id">
+    <option value="">Все ипподромы</option>
+    {% for hippodrome in hippodromes %}
+      <option value="{{ hippodrome.id }}" {% if hippodrome_id == hippodrome.id %}selected{% endif %}>{{ hippodrome.full_name }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn--ghost" type="submit">Применить</button>
+  {% if search or status or hippodrome_id %}<a class="btn btn--ghost" href="/races">Сбросить</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if page_obj.items %}
+  <table class="table">
+    <thead>
+      <tr><th>Дата и время</th><th>Название</th><th>Ипподром</th><th>Участников</th><th>Результатов</th><th>Статус</th><th class="table__actions">Действия</th></tr>
+    </thead>
+    <tbody>
+      {% for race in page_obj.items %}
+      <tr>
+        <td>{{ race.race_date.strftime('%d.%m.%Y') }}<br><span class="muted">{{ race.race_time.strftime('%H:%M') }}</span></td>
+        <td><a href="/races/{{ race.id }}"><strong>{{ race.display_title }}</strong></a></td>
+        <td>{{ race.hippodrome.full_name }}</td>
+        <td>{{ race.results|length }}</td>
+        <td>{{ race.finished_count }}</td>
+        <td><span class="badge badge--{{ race.status }}">{{ race.status_label }}</span></td>
+        <td class="table__actions">
+          <a class="btn btn--ghost btn--sm" href="/races/{{ race.id }}">Открыть</a>
+          {% if user.can_edit %}
+            <a class="btn btn--ghost btn--sm" href="/races/{{ race.id }}/edit">Изменить</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pagination(page_obj, '/races', '&search=' ~ (search|urlencode) ~ '&status=' ~ (status|urlencode) ~ '&hippodrome_id=' ~ (hippodrome_id or '')) }}
+  {% else %}
+  <p class="empty">Состязания не найдены.</p>
+  {% endif %}
+</div>
+{% endblock %}

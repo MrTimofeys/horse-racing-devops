@@ -1,0 +1,26 @@
+{% macro pagination(page_obj, base_url, extra_query='') %}
+{% if page_obj.pages > 1 %}
+<nav class="pagination">
+  <span class="pagination__info">
+    Показано {{ page_obj.first_index }}–{{ page_obj.last_index }} из {{ page_obj.total }}
+  </span>
+  <span class="pagination__controls">
+    {% if page_obj.has_prev %}
+      <a class="btn btn--ghost btn--sm" href="{{ base_url }}?page={{ page_obj.prev_page }}{{ extra_query }}">← Назад</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm is-disabled">← Назад</span>
+    {% endif %}
+
+    <span class="pagination__page">Страница {{ page_obj.page }} из {{ page_obj.pages }}</span>
+
+    {% if page_obj.has_next %}
+      <a class="btn btn--ghost btn--sm" href="{{ base_url }}?page={{ page_obj.next_page }}{{ extra_query }}">Вперёд →</a>
+    {% else %}
+      <span class="btn btn--ghost btn--sm is-disabled">Вперёд →</span>
+    {% endif %}
+  </span>
+</nav>
+{% else %}
+<p class="pagination__info pagination__info--single">Всего записей: {{ page_obj.total }}</p>
+{% endif %}
+{% endmacro %}

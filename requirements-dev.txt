@@ -1,0 +1,5 @@
+# Зависимости для тестировщика и разработчика.
+-r requirements.txt
+pytest>=8.0
+httpx>=0.27
+pytest-cov>=6.0

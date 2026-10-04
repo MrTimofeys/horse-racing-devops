@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pagination %}
+{% block title %}Лошади · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>Лошади</h1>
+    <p class="muted">Справочник лошадей: кличка, пол, возраст, владелец.</p>
+  </div>
+  {% if user.can_edit %}
+    <a class="btn btn--primary" href="/horses/new">+ Добавить лошадь</a>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/horses">
+  <input class="field__input" type="search" name="search" value="{{ search }}" placeholder="Поиск по кличке">
+  <select class="field__input field__input--select" name="owner_id">
+    <option value="">Все владельцы</option>
+    {% for owner in owners %}
+      <option value="{{ owner.id }}" {% if owner_id == owner.id %}selected{% endif %}>{{ owner.name }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn btn--ghost" type="submit">Применить</button>
+  {% if search or owner_id %}<a class="btn btn--ghost" href="/horses">Сбросить</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if page_obj.items %}
+  <table class="table">
+    <thead><tr><th>Кличка</th><th>Пол</th><th>Возраст</th><th>Владелец</th><th class="table__actions">Действия</th></tr></thead>
+    <tbody>
+      {% for horse in page_obj.items %}
+      <tr>
+        <td><a href="/horses/{{ horse.id }}"><strong>{{ horse.name }}</strong></a></td>
+        <td>{{ horse.sex }}</td>
+        <td>{{ horse.age }}</td>
+        <td>{{ horse.owner_name }}</td>
+        <td class="table__actions">
+          <a class="btn btn--ghost btn--sm" href="/horses/{{ horse.id }}">Карточка</a>
+          {% if user.can_edit %}
+            <a class="btn btn--ghost btn--sm" href="/horses/{{ horse.id }}/edit">Изменить</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pagination(page_obj, '/horses', '&search=' ~ (search|urlencode) ~ '&owner_id=' ~ (owner_id or '')) }}
+  {% else %}
+  <p class="empty">Лошади не найдены.</p>
+  {% endif %}
+</div>
+{% endblock %}

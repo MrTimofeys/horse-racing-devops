@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение ипподрома' if hippodrome else 'Новый ипподром' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение ипподрома' if hippodrome else 'Новый ипподром' }}</h1>
+  <a class="btn btn--ghost" href="/hippodromes">← К списку</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/hippodromes/' ~ hippodrome.id ~ '/edit' if hippodrome else '/hippodromes/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Название <span class="req">*</span></span>
+    <input class="field__input" type="text" name="name" value="{{ data.name }}" maxlength="160" required>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Город</span>
+    <input class="field__input" type="text" name="city" value="{{ data.city }}" maxlength="128">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Адрес</span>
+    <input class="field__input" type="text" name="address" value="{{ data.address }}" maxlength="255">
+  </label>
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="/hippodromes">Отмена</a>
+  </div>
+</form>
+{% endblock %}

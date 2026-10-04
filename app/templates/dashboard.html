@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Главная · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>Сводка по системе</h1>
+  <p class="muted">Учёт лошадей, владельцев, жокеев, ипподромов и результатов заездов.</p>
+</div>
+
+<section class="stat-grid">
+  <a class="stat" href="/races"><span class="stat__value">{{ stats.races }}</span><span class="stat__label">Состязания</span></a>
+  <a class="stat" href="/races?status=planned"><span class="stat__value">{{ stats.races_planned }}</span><span class="stat__label">Запланировано</span></a>
+  <a class="stat" href="/horses"><span class="stat__value">{{ stats.horses }}</span><span class="stat__label">Лошади</span></a>
+  <a class="stat" href="/jockeys"><span class="stat__value">{{ stats.jockeys }}</span><span class="stat__label">Жокеи</span></a>
+  <a class="stat" href="/owners"><span class="stat__value">{{ stats.owners }}</span><span class="stat__label">Владельцы</span></a>
+  <a class="stat" href="/hippodromes"><span class="stat__value">{{ stats.hippodromes }}</span><span class="stat__label">Ипподромы</span></a>
+  <div class="stat stat--static"><span class="stat__value">{{ stats.results }}</span><span class="stat__label">Внесено результатов</span></div>
+</section>
+
+<div class="columns">
+  <section class="card">
+    <div class="card__head">
+      <h2>Ближайшие состязания</h2>
+      <a class="btn btn--ghost btn--sm" href="/races">Все состязания</a>
+    </div>
+    {% if upcoming %}
+      <table class="table">
+        <thead><tr><th>Дата</th><th>Состязание</th><th>Ипподром</th><th>Участников</th></tr></thead>
+        <tbody>
+        {% for race in upcoming %}
+          <tr>
+            <td>{{ race.race_date.strftime('%d.%m.%Y') }}<br><span class="muted">{{ race.race_time.strftime('%H:%M') }}</span></td>
+            <td><a href="/races/{{ race.id }}">{{ race.display_title }}</a></td>
+            <td>{{ race.hippodrome.full_name }}</td>
+            <td>{{ race.results|length }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Запланированных состязаний нет.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card__head">
+      <h2>Последние завершённые заезды</h2>
+    </div>
+    {% if recent %}
+      <table class="table">
+        <thead><tr><th>Дата</th><th>Состязание</th><th>Результатов</th></tr></thead>
+        <tbody>
+        {% for race in recent %}
+          <tr>
+            <td>{{ race.race_date.strftime('%d.%m.%Y') }}</td>
+            <td><a href="/races/{{ race.id }}">{{ race.display_title }}</a></td>
+            <td>{{ race.finished_count }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Завершённых заездов пока нет.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="card__head">
+    <h2>Жокеи с наивысшим рейтингом</h2>
+    <a class="btn btn--ghost btn--sm" href="/jockeys">Все жокеи</a>
+  </div>
+  {% if top_jockeys %}
+    <table class="table">
+      <thead><tr><th>Жокей</th><th>Возраст</th><th>Рейтинг</th><th>Заездов</th><th>Побед</th></tr></thead>
+      <tbody>
+      {% for jockey in top_jockeys %}
+        <tr>
+          <td><a href="/jockeys/{{ jockey.id }}">{{ jockey.name }}</a></td>
+          <td>{{ jockey.age }}</td>
+          <td><span class="badge badge--rating">{{ jockey.rating }}</span></td>
+          <td>{{ jockey.results|length }}</td>
+          <td>{{ jockey.wins }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Справочник жокеев пуст.</p>
+  {% endif %}
+</section>
+{% endblock %}

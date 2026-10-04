@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pagination %}
+{% block title %}Владельцы · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>Владельцы лошадей</h1>
+    <p class="muted">Справочник владельцев: имя, адрес, телефон.</p>
+  </div>
+  {% if user.can_edit %}
+    <a class="btn btn--primary" href="/owners/new">+ Добавить владельца</a>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/owners">
+  <input class="field__input" type="search" name="search" value="{{ search }}" placeholder="Поиск по имени, адресу или телефону">
+  <button class="btn btn--ghost" type="submit">Найти</button>
+  {% if search %}<a class="btn btn--ghost" href="/owners">Сбросить</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if page_obj.items %}
+  <table class="table">
+    <thead>
+      <tr><th>Имя владельца</th><th>Адрес</th><th>Телефон</th><th>Лошадей</th><th class="table__actions">Действия</th></tr>
+    </thead>
+    <tbody>
+      {% for owner in page_obj.items %}
+      <tr>
+        <td><strong>{{ owner.name }}</strong></td>
+        <td>{{ owner.address or '—' }}</td>
+        <td>{{ owner.phone or '—' }}</td>
+        <td><a href="/horses?owner_id={{ owner.id }}">{{ owner.horses|length }}</a></td>
+        <td class="table__actions">
+          <a class="btn btn--ghost btn--sm" href="/owners/{{ owner.id }}/edit">Изменить</a>
+          {% if user.can_edit %}
+          <form method="post" action="/owners/{{ owner.id }}/delete" class="inline-form"
+                onsubmit="return confirm('Удалить владельца «{{ owner.name }}»?');">
+            <button type="submit" class="btn btn--danger btn--sm">Удалить</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pagination(page_obj, '/owners', '&search=' ~ (search|urlencode)) }}
+  {% else %}
+  <p class="empty">Владельцы не найдены.</p>
+  {% endif %}
+</div>
+{% endblock %}

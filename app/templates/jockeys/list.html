@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pagination %}
+{% block title %}Жокеи · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>Жокеи</h1>
+    <p class="muted">Справочник жокеев: имя, адрес, возраст, рейтинг.</p>
+  </div>
+  {% if user.can_edit %}
+    <a class="btn btn--primary" href="/jockeys/new">+ Добавить жокея</a>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/jockeys">
+  <input class="field__input" type="search" name="search" value="{{ search }}" placeholder="Поиск по имени или адресу">
+  <button class="btn btn--ghost" type="submit">Найти</button>
+  {% if search %}<a class="btn btn--ghost" href="/jockeys">Сбросить</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if page_obj.items %}
+  <table class="table">
+    <thead><tr><th>Жокей</th><th>Адрес</th><th>Возраст</th><th>Рейтинг</th><th>Заездов</th><th class="table__actions">Действия</th></tr></thead>
+    <tbody>
+      {% for jockey in page_obj.items %}
+      <tr>
+        <td><a href="/jockeys/{{ jockey.id }}"><strong>{{ jockey.name }}</strong></a></td>
+        <td>{{ jockey.address or '—' }}</td>
+        <td>{{ jockey.age }}</td>
+        <td><span class="badge badge--rating">{{ jockey.rating }}</span></td>
+        <td>{{ jockey.results|length }}</td>
+        <td class="table__actions">
+          <a class="btn btn--ghost btn--sm" href="/jockeys/{{ jockey.id }}">Карточка</a>
+          {% if user.can_edit %}
+            <a class="btn btn--ghost btn--sm" href="/jockeys/{{ jockey.id }}/edit">Изменить</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pagination(page_obj, '/jockeys', '&search=' ~ (search|urlencode)) }}
+  {% else %}
+  <p class="empty">Жокеи не найдены.</p>
+  {% endif %}
+</div>
+{% endblock %}

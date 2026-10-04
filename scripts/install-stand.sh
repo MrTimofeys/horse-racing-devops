@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+#
+# Развёртывание АС «Скачки» на стенде TEST / STAGE / PROD.
+#
+# Скрипт:
+#   1) копирует исходный код репозитория в /opt/horse-racing-devops;
+#   2) создаёт виртуальное окружение Python и ставит зависимости;
+#   3) формирует файл .env с параметрами конкретного стенда;
+#   4) (по желанию) создаёт базу данных PostgreSQL;
+#   5) регистрирует и запускает службу systemd skachki.
+#
+# Использование:
+#   sudo bash scripts/install-stand.sh test
+#   sudo bash scripts/install-stand.sh stage --port 8080 --with-postgres
+#   sudo bash scripts/install-stand.sh prod  --with-postgres --no-demo-data
+#
+set -euo pipefail
+
+SERVICE_NAME="skachki"
+APP_USER="skachki"
+APP_DIR="/opt/horse-racing-devops"
+DB_NAME="skachki"
+DB_USER="skachki"
+
+STAND=""
+PORT=""
+USE_POSTGRES=0
+SEED_DEMO=1
+
+usage() {
+    cat <<'EOF'
+Использование: sudo bash scripts/install-stand.sh <test|stage|prod> [параметры]
+
+Параметры:
+  --port <номер>       порт приложения (по умолчанию 8080)
+  --with-postgres      использовать PostgreSQL вместо SQLite
+  --no-demo-data       не загружать демонстрационные данные
+  -h, --help           показать эту справку
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        test|stage|prod)
+            STAND="$1"; shift ;;
+        --port)
+            PORT="${2:-}"; shift 2 ;;
+        --with-postgres)
+            USE_POSTGRES=1; shift ;;
+        --no-demo-data)
+            SEED_DEMO=0; shift ;;
+        -h|--help)
+            usage; exit 0 ;;
+        *)
+            echo "Неизвестный параметр: $1" >&2; usage; exit 1 ;;
+    esac
+done
+
+if [[ -z "${STAND}" ]]; then
+    echo "Не указан стенд. Укажите test, stage или prod." >&2
+    usage
+    exit 1
+fi
+
+if [[ "${EUID}" -ne 0 ]]; then
+    echo "Скрипт нужно запускать от имени root: sudo bash $0 ${STAND}" >&2
+    exit 1
+fi
+
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT="${PORT:-8080}"
+
+# Стенд PROD по умолчанию разворачивается без демонстрационных данных.
+if [[ "${STAND}" == "prod" && "${SEED_DEMO}" -eq 1 ]]; then
+    SEED_DEMO=0
+fi
+
+echo "==> Стенд: ${STAND}"
+echo "    Исходный код : ${SOURCE_DIR}"
+echo "    Каталог      : ${APP_DIR}"
+echo "    Порт         : ${PORT}"
+echo "    СУБД         : $( [[ ${USE_POSTGRES} -eq 1 ]] && echo PostgreSQL || echo SQLite )"
+echo "    Демо-данные  : $( [[ ${SEED_DEMO} -eq 1 ]] && echo да || echo нет )"
+echo
+
+# --- 1. Системный пользователь -------------------------------------------
+if ! id -u "${APP_USER}" >/dev/null 2>&1; then
+    echo "==> Создание системного пользователя ${APP_USER}"
+    useradd --system --create-home --shell /usr/sbin/nologin "${APP_USER}"
+fi
+
+# --- 2. Копирование кода --------------------------------------------------
+echo "==> Копирование исходного кода в ${APP_DIR}"
+mkdir -p "${APP_DIR}"
+rsync -a --delete \
+    --exclude '.git' \
+    --exclude '.venv' \
+    --exclude 'instance' \
+    --exclude '__pycache__' \
+    --exclude '.pytest_cache' \
+    "${SOURCE_DIR}/" "${APP_DIR}/"
+
+# --- 3. Виртуальное окружение и зависимости ------------------------------
+echo "==> Создание виртуального окружения и установка зависимостей"
+if [[ ! -x "${APP_DIR}/.venv/bin/python" ]]; then
+    python3 -m venv "${APP_DIR}/.venv"
+fi
+"${APP_DIR}/.venv/bin/pip" install --quiet --upgrade pip
+"${APP_DIR}/.venv/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"
+
+if [[ "${USE_POSTGRES}" -eq 1 ]]; then
+    "${APP_DIR}/.venv/bin/pip" install --quiet -r "${APP_DIR}/requirements-postgres.txt"
+fi
+
+# --- 4. База данных -------------------------------------------------------
+if [[ "${USE_POSTGRES}" -eq 1 ]]; then
+    echo "==> Подготовка PostgreSQL"
+    systemctl enable --now postgresql
+
+    DB_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
+
+    sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}') THEN
+        CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}';
+    ELSE
+        ALTER ROLE ${DB_USER} PASSWORD '${DB_PASSWORD}';
+    END IF;
+END
+\$\$;
+SQL
+
+    if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+        sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+    fi
+
+    DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}"
+else
+    DATABASE_URL="sqlite:///instance/skachki.db"
+fi
+
+# --- 5. Файл конфигурации стенда -----------------------------------------
+echo "==> Запись ${APP_DIR}/.env"
+mkdir -p "${APP_DIR}/instance"
+cat > "${APP_DIR}/.env" <<ENV
+# Конфигурация стенда ${STAND}, создана scripts/install-stand.sh
+STAND_NAME=${STAND}
+DATABASE_URL=${DATABASE_URL}
+APP_HOST=0.0.0.0
+APP_PORT=${PORT}
+SESSION_TTL_HOURS=12
+AUTO_SEED=true
+SEED_DEMO_DATA=$( [[ ${SEED_DEMO} -eq 1 ]] && echo true || echo false )
+DEMO_LOGIN_HINT=$( [[ "${STAND}" == "prod" ]] && echo false || echo true )
+ENV
+
+chmod 640 "${APP_DIR}/.env"
+chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
+
+# --- 6. Инициализация базы ------------------------------------------------
+echo "==> Инициализация базы данных"
+if [[ "${SEED_DEMO}" -eq 1 ]]; then
+    SEED_ARGS="seed --demo"
+else
+    SEED_ARGS="seed"
+fi
+
+sudo -u "${APP_USER}" bash -c "cd '${APP_DIR}' && set -a && . ./.env && set +a && ./.venv/bin/python -m app.cli init-db && ./.venv/bin/python -m app.cli ${SEED_ARGS}"
+
+# --- 7. Служба systemd ----------------------------------------------------
+echo "==> Регистрация службы ${SERVICE_NAME}.service"
+cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<UNIT
+[Unit]
+Description=АС «Скачки» — стенд ${STAND}
+Documentation=https://github.com/MrTimofeys/horse-racing-devops
+After=network-online.target
+$( [[ ${USE_POSTGRES} -eq 1 ]] && echo "Wants=postgresql.service" )
+
+[Service]
+Type=simple
+User=${APP_USER}
+Group=${APP_USER}
+WorkingDirectory=${APP_DIR}
+EnvironmentFile=${APP_DIR}/.env
+ExecStart=${APP_DIR}/.venv/bin/uvicorn app.main:app --host \${APP_HOST} --port \${APP_PORT} --workers 2
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${SERVICE_NAME}
+
+# Ограничения безопасности службы
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable "${SERVICE_NAME}"
+systemctl restart "${SERVICE_NAME}"
+
+# --- 8. Проверка ----------------------------------------------------------
+echo "==> Ожидание запуска службы"
+for _ in $(seq 1 30); do
+    if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+echo
+echo "==> Состояние службы"
+systemctl --no-pager --lines=0 status "${SERVICE_NAME}" || true
+
+echo
+echo "==> Проверка работоспособности"
+curl -s "http://127.0.0.1:${PORT}/api/health" || echo "(служба ещё не отвечает — смотрите journalctl -u ${SERVICE_NAME})"
+
+cat <<EOF
+
+Стенд ${STAND} развёрнут.
+
+  Панель управления : http://127.0.0.1:${PORT}
+  Документация API  : http://127.0.0.1:${PORT}/docs
+  Проверка стенда   : curl -s http://127.0.0.1:${PORT}/api/health
+
+Полезные команды:
+  sudo systemctl status ${SERVICE_NAME}
+  sudo journalctl -u ${SERVICE_NAME} -f
+  sudo systemctl restart ${SERVICE_NAME}
+  sudo bash scripts/backup.sh
+EOF

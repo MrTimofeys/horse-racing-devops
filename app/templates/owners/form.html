@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение владельца' if owner else 'Новый владелец' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение владельца' if owner else 'Новый владелец' }}</h1>
+  <a class="btn btn--ghost" href="/owners">← К списку</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/owners/' ~ owner.id ~ '/edit' if owner else '/owners/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Имя владельца <span class="req">*</span></span>
+    <input class="field__input" type="text" name="name" value="{{ data.name }}" maxlength="128" required>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Адрес</span>
+    <input class="field__input" type="text" name="address" value="{{ data.address }}" maxlength="255">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Телефон</span>
+    <input class="field__input" type="text" name="phone" value="{{ data.phone }}" maxlength="32"
+           placeholder="+7 (___) ___-__-__">
+  </label>
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="/owners">Отмена</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение состязания' if race else 'Новое состязание' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение состязания' if race else 'Новое состязание' }}</h1>
+  <a class="btn btn--ghost" href="{{ '/races/' ~ race.id if race else '/races' }}">← Назад</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/races/' ~ race.id ~ '/edit' if race else '/races/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Название состязания</span>
+    <input class="field__input" type="text" name="title" value="{{ data.title }}" maxlength="160"
+           placeholder="Например: Кубок открытия сезона">
+    <span class="field__help">Название необязательно — если оставить пустым, будет «Заезд №…».</span>
+  </label>
+
+  <div class="form__row">
+    <label class="field">
+      <span class="field__label">Дата <span class="req">*</span></span>
+      <input class="field__input" type="date" name="race_date" value="{{ data.race_date }}" required>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Время начала <span class="req">*</span></span>
+      <input class="field__input" type="time" name="race_time" value="{{ data.race_time }}" required>
+    </label>
+  </div>
+
+  <div class="form__row">
+    <label class="field">
+      <span class="field__label">Ипподром <span class="req">*</span></span>
+      <select class="field__input field__input--select" name="hippodrome_id" required>
+        <option value="">— выберите ипподром —</option>
+        {% for hippodrome in hippodromes %}
+          <option value="{{ hippodrome.id }}" {% if data.hippodrome_id|string == hippodrome.id|string %}selected{% endif %}>
+            {{ hippodrome.full_name }}
+          </option>
+        {% endfor %}
+      </select>
+      <span class="field__help">Нет нужного ипподрома? <a href="/hippodromes/new">Добавьте его в справочник</a>.</span>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Статус</span>
+      <select class="field__input field__input--select" name="status">
+        {% for value in statuses %}
+          <option value="{{ value }}" {% if data.status == value %}selected{% endif %}>{{ RACE_STATUS_LABELS[value] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <label class="field">
+    <span class="field__label">Примечания</span>
+    <textarea class="field__input" name="notes" rows="3" maxlength="2000"
+              placeholder="Дистанция, тип дорожки, условия заезда">{{ data.notes }}</textarea>
+  </label>
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="{{ '/races/' ~ race.id if race else '/races' }}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pagination %}
+{% block title %}Ипподромы · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>Ипподромы</h1>
+    <p class="muted">Места проведения состязаний.</p>
+  </div>
+  {% if user.can_edit %}
+    <a class="btn btn--primary" href="/hippodromes/new">+ Добавить ипподром</a>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/hippodromes">
+  <input class="field__input" type="search" name="search" value="{{ search }}" placeholder="Поиск по названию или городу">
+  <button class="btn btn--ghost" type="submit">Найти</button>
+  {% if search %}<a class="btn btn--ghost" href="/hippodromes">Сбросить</a>{% endif %}
+</form>
+
+<div class="card">
+  {% if page_obj.items %}
+  <table class="table">
+    <thead><tr><th>Название</th><th>Город</th><th>Адрес</th><th>Состязаний</th><th class="table__actions">Действия</th></tr></thead>
+    <tbody>
+      {% for hippodrome in page_obj.items %}
+      <tr>
+        <td><strong>{{ hippodrome.name }}</strong></td>
+        <td>{{ hippodrome.city or '—' }}</td>
+        <td>{{ hippodrome.address or '—' }}</td>
+        <td><a href="/races?hippodrome_id={{ hippodrome.id }}">{{ hippodrome.races|length }}</a></td>
+        <td class="table__actions">
+          <a class="btn btn--ghost btn--sm" href="/hippodromes/{{ hippodrome.id }}/edit">Изменить</a>
+          {% if user.can_edit %}
+          <form method="post" action="/hippodromes/{{ hippodrome.id }}/delete" class="inline-form"
+                onsubmit="return confirm('Удалить ипподром «{{ hippodrome.name }}»?');">
+            <button type="submit" class="btn btn--danger btn--sm">Удалить</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ pagination(page_obj, '/hippodromes', '&search=' ~ (search|urlencode)) }}
+  {% else %}
+  <p class="empty">Ипподромы не найдены.</p>
+  {% endif %}
+</div>
+{% endblock %}

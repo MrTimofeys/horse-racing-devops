@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}{{ race.display_title }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>{{ race.display_title }}</h1>
+    <p class="muted">
+      {{ race.race_date.strftime('%d.%m.%Y') }} в {{ race.race_time.strftime('%H:%M') }} ·
+      {{ race.hippodrome.full_name }}
+      {% if race.notes %}<br>{{ race.notes }}{% endif %}
+    </p>
+  </div>
+  <div class="page__head-actions">
+    <span class="badge badge--{{ race.status }}">{{ race.status_label }}</span>
+    <a class="btn btn--ghost" href="/races">← К списку</a>
+    {% if user.can_edit %}
+      <a class="btn btn--primary" href="/races/{{ race.id }}/edit">Изменить</a>
+      {% if race.status != 'finished' %}
+        <form method="post" action="/races/{{ race.id }}/finish" class="inline-form">
+          <button type="submit" class="btn btn--ghost">Завершить</button>
+        </form>
+      {% endif %}
+      {% if race.status == 'planned' %}
+        <form method="post" action="/races/{{ race.id }}/cancel" class="inline-form"
+              onsubmit="return confirm('Отменить состязание?');">
+          <button type="submit" class="btn btn--ghost">Отменить</button>
+        </form>
+      {% endif %}
+      <form method="post" action="/races/{{ race.id }}/delete" class="inline-form"
+            onsubmit="return confirm('Удалить состязание вместе со всем составом заезда?');">
+        <button type="submit" class="btn btn--danger">Удалить</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<section class="card">
+  <div class="card__head">
+    <h2>Состав заезда и результаты</h2>
+    <span class="muted">
+      {{ race.results|length|plural('участник', 'участника', 'участников') }},
+      результаты внесены у {{ race.finished_count }}
+    </span>
+  </div>
+
+  {% if race.participants %}
+  <table class="table table--results">
+    <thead>
+      <tr>
+        <th class="col-place">Место</th>
+        <th>Лошадь</th>
+        <th>Жокей</th>
+        <th class="col-time">Показанное время</th>
+        <th>Примечание</th>
+        {% if user.can_edit %}<th class="table__actions">Внести результат</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for result in race.participants %}
+      <tr>
+        <td class="col-place">
+          {% if result.place == 1 %}<span class="badge badge--gold">🥇 1-е</span>
+          {% elif result.place == 2 %}<span class="badge badge--silver">🥈 2-е</span>
+          {% elif result.place == 3 %}<span class="badge badge--bronze">🥉 3-е</span>
+          {% elif result.place %}<span class="badge">{{ result.place }}-е</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td><a href="/horses/{{ result.horse.id }}"><strong>{{ result.horse.name }}</strong></a></td>
+        <td><a href="/jockeys/{{ result.jockey.id }}">{{ result.jockey.name }}</a></td>
+        <td class="col-time">{{ result.time_label }}</td>
+        <td>{{ result.comment or '—' }}</td>
+        {% if user.can_edit %}
+        <td class="table__actions">
+          <form method="post" action="/races/{{ race.id }}/results/{{ result.id }}" class="result-form">
+            <input class="field__input field__input--tiny" type="number" name="place" min="1" max="99"
+                   value="{{ result.place if result.place is not none else '' }}" placeholder="место" title="Занятое место">
+            <input class="field__input field__input--tiny" type="text" name="finish_time"
+                   value="{{ result.time_label if result.finish_time_seconds is not none else '' }}"
+                   placeholder="1:23,45" title="Показанное время в формате минуты:секунды,сотые">
+            <input class="field__input field__input--tiny" type="text" name="comment"
+                   value="{{ result.comment }}" placeholder="примечание" title="Примечание">
+            <button type="submit" class="btn btn--primary btn--sm">Сохранить</button>
+          </form>
+          <form method="post" action="/races/{{ race.id }}/results/{{ result.id }}/delete" class="inline-form"
+                onsubmit="return confirm('Убрать участника из заезда?');">
+            <button type="submit" class="btn btn--danger btn--sm">Убрать</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Состав заезда пока не объявлен.</p>
+  {% endif %}
+</section>
+
+{% if user.can_edit %}
+<section class="card">
+  <div class="card__head">
+    <h2>Добавить участника заезда</h2>
+  </div>
+  <form method="post" action="/races/{{ race.id }}/participants" class="form form--inline">
+    <label class="field">
+      <span class="field__label">Лошадь <span class="req">*</span></span>
+      <select class="field__input field__input--select" name="horse_id" required>
+        <option value="">— выберите лошадь —</option>
+        {% for horse in horses %}
+          <option value="{{ horse.id }}">{{ horse.name }} ({{ horse.sex }}, {{ horse.age }} лет)</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Жокей <span class="req">*</span></span>
+      <select class="field__input field__input--select" name="jockey_id" required>
+        <option value="">— выберите жокея —</option>
+        {% for jockey in jockeys %}
+          <option value="{{ jockey.id }}">{{ jockey.name }} (рейтинг {{ jockey.rating }})</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field field--narrow">
+      <span class="field__label">Место</span>
+      <input class="field__input" type="number" name="place" min="1" max="99" placeholder="—">
+    </label>
+
+    <label class="field field--narrow">
+      <span class="field__label">Время</span>
+      <input class="field__input" type="text" name="finish_time" placeholder="1:23,45">
+    </label>
+
+    <label class="field">
+      <span class="field__label">Примечание</span>
+      <input class="field__input" type="text" name="comment" maxlength="255" placeholder="необязательно">
+    </label>
+
+    <div class="form__actions">
+      <button class="btn btn--primary" type="submit">Добавить в заезд</button>
+    </div>
+  </form>
+  <p class="field__help">
+    Место и время можно не заполнять — тогда участник будет заявлен без результата.
+    Показанное время указывается в формате <code>минуты:секунды,сотые</code>, например <code>2:05,30</code>.
+  </p>
+</section>
+{% endif %}
+
+<p><a class="btn btn--ghost btn--sm" href="/api/races/{{ race.id }}">Посмотреть этот заезд в формате JSON</a></p>
+{% endblock %}

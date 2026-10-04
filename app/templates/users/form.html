@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение пользователя' if edited else 'Новый пользователь' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение пользователя' if edited else 'Новый пользователь' }}</h1>
+  <a class="btn btn--ghost" href="/users">← К списку</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/users/' ~ edited.id ~ '/edit' if edited else '/users/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Логин <span class="req">*</span></span>
+    {% if edited %}
+      <input class="field__input" type="text" value="{{ edited.username }}" disabled>
+      <span class="field__help">Логин изменить нельзя.</span>
+    {% else %}
+      <input class="field__input" type="text" name="username" value="{{ data.username }}"
+             maxlength="64" required autocomplete="off">
+    {% endif %}
+  </label>
+
+  <label class="field">
+    <span class="field__label">Имя пользователя</span>
+    <input class="field__input" type="text" name="full_name" value="{{ data.full_name }}" maxlength="128">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Роль <span class="req">*</span></span>
+    <select class="field__input field__input--select" name="role" required>
+      {% for value in USER_ROLES %}
+        <option value="{{ value }}" {% if data.role == value %}selected{% endif %}>
+          {{ USER_ROLE_LABELS[value] }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+
+  {% if edited %}
+    <label class="field field--checkbox">
+      <input type="checkbox" name="is_active" value="true" {% if data.is_active %}checked{% endif %}>
+      <span>Учётная запись активна (пользователь может входить в систему)</span>
+    </label>
+  {% else %}
+    <div class="form__row">
+      <label class="field">
+        <span class="field__label">Пароль <span class="req">*</span></span>
+        <input class="field__input" type="password" name="password" minlength="6" required autocomplete="new-password">
+      </label>
+
+      <label class="field">
+        <span class="field__label">Повторите пароль <span class="req">*</span></span>
+        <input class="field__input" type="password" name="password2" minlength="6" required autocomplete="new-password">
+      </label>
+    </div>
+    <p class="field__help">Пароль хранится в виде хеша PBKDF2-HMAC-SHA256 и не может быть прочитан администратором.</p>
+  {% endif %}
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="/users">Отмена</a>
+  </div>
+</form>
+{% endblock %}

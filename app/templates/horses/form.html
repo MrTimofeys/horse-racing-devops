@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Изменение лошади' if horse else 'Новая лошадь' }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <h1>{{ 'Изменение лошади' if horse else 'Новая лошадь' }}</h1>
+  <a class="btn btn--ghost" href="{{ '/horses/' ~ horse.id if horse else '/horses' }}">← Назад</a>
+</div>
+
+<form class="card form" method="post"
+      action="{{ '/horses/' ~ horse.id ~ '/edit' if horse else '/horses/new' }}">
+
+  {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
+
+  <label class="field">
+    <span class="field__label">Кличка <span class="req">*</span></span>
+    <input class="field__input" type="text" name="name" value="{{ data.name }}" maxlength="128" required>
+  </label>
+
+  <div class="form__row">
+    <label class="field">
+      <span class="field__label">Пол <span class="req">*</span></span>
+      <select class="field__input field__input--select" name="sex" required>
+        {% for sex in HORSE_SEXES %}
+          <option value="{{ sex }}" {% if data.sex == sex %}selected{% endif %}>{{ sex }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Возраст, лет <span class="req">*</span></span>
+      <input class="field__input" type="number" name="age" value="{{ data.age }}" min="1" max="39" required>
+    </label>
+  </div>
+
+  <label class="field">
+    <span class="field__label">Владелец</span>
+    <select class="field__input field__input--select" name="owner_id">
+      <option value="">— не указан —</option>
+      {% for owner in owners %}
+        <option value="{{ owner.id }}" {% if data.owner_id|string == owner.id|string %}selected{% endif %}>
+          {{ owner.name }}
+        </option>
+      {% endfor %}
+    </select>
+    <span class="field__help">Нет нужного владельца? <a href="/owners/new">Добавьте его в справочник</a>.</span>
+  </label>
+
+  <div class="form__actions">
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <a class="btn btn--ghost" href="{{ '/horses/' ~ horse.id if horse else '/horses' }}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

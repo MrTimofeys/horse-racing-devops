@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Страница не найдена · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+  <div class="error-page__code">404</div>
+  <h1>Страница не найдена</h1>
+  <p>{{ message }}</p>
+  <a class="btn btn--primary" href="/dashboard">На главную</a>
+</div>
+{% endblock %}

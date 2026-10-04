@@ -1,0 +1,4 @@
+# Драйвер PostgreSQL. Нужен только если DATABASE_URL указывает на postgresql://
+# Устанавливается отдельно, чтобы SQLite-развёртывание не тянуло лишние пакеты:
+#   pip install -r requirements-postgres.txt
+psycopg[binary]>=3.2

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ horse.name }} · {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <h1>{{ horse.name }}</h1>
+    <p class="muted">{{ horse.sex }}, {{ horse.age }} лет · владелец: {{ horse.owner_name }}</p>
+  </div>
+  <div class="page__head-actions">
+    <a class="btn btn--ghost" href="/horses">← К списку</a>
+    {% if user.can_edit %}
+      <a class="btn btn--primary" href="/horses/{{ horse.id }}/edit">Изменить</a>
+      <form method="post" action="/horses/{{ horse.id }}/delete" class="inline-form"
+            onsubmit="return confirm('Удалить лошадь «{{ horse.name }}»?');">
+        <button type="submit" class="btn btn--danger">Удалить</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<section class="card">
+  <div class="card__head">
+    <h2>История участия в состязаниях</h2>
+    <span class="muted">{{ history|length|plural('заезд', 'заезда', 'заездов') }}</span>
+  </div>
+
+  {% if history %}
+  <table class="table">
+    <thead>
+      <tr><th>Дата</th><th>Состязание</th><th>Ипподром</th><th>Жокей</th><th>Место</th><th>Время</th><th>Статус</th></tr>
+    </thead>
+    <tbody>
+      {% for result in history %}
+      <tr>
+        <td>{{ result.race.race_date.strftime('%d.%m.%Y') }}</td>
+        <td><a href="/races/{{ result.race.id }}">{{ result.race.display_title }}</a></td>
+        <td>{{ result.race.hippodrome.full_name if result.race.hippodrome else '—' }}</td>
+        <td><a href="/jockeys/{{ result.jockey.id }}">{{ result.jockey.name }}</a></td>
+        <td>
+          {% if result.place == 1 %}<span class="badge badge--gold">🥇 {{ result.place_label }}</span>
+          {% elif result.place == 2 %}<span class="badge badge--silver">🥈 {{ result.place_label }}</span>
+          {% elif result.place == 3 %}<span class="badge badge--bronze">🥉 {{ result.place_label }}</span>
+          {% else %}{{ result.place_label }}{% endif %}
+        </td>
+        <td>{{ result.time_label }}</td>
+        <td>
+          {% if result.has_result %}<span class="badge badge--ok">результат внесён</span>
+          {% else %}<span class="badge badge--wait">ожидается</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">Лошадь ещё не участвовала в состязаниях.</p>
+  {% endif %}
+</section>
+{% endblock %}
