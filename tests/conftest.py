@@ -17,7 +17,15 @@ sys.path.insert(0, str(ROOT))
 
 TEST_DB_PATH = ROOT / "instance" / "test_skachki.db"
 
-os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+# Если DATABASE_URL задан извне, тесты выполняются на этой СУБД. Это позволяет
+# прогнать весь набор и на PostgreSQL — так проверяется, что поведение стендов
+# STAGE и PROD совпадает с поведением стенда TEST на SQLite:
+#
+#   DATABASE_URL="postgresql+psycopg://... " pytest
+#
+EXTERNAL_DATABASE_URL = os.environ.get("DATABASE_URL")
+
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DB_PATH}")
 os.environ["STAND_NAME"] = "test"
 os.environ["AUTO_SEED"] = "true"
 os.environ["SEED_DEMO_DATA"] = "true"
@@ -38,15 +46,19 @@ VIEWER = ("viewer", "viewer123")
 @pytest.fixture(scope="session", autouse=True)
 def database():
     """Чистая база на весь прогон тестов + демонстрационные данные."""
-    if TEST_DB_PATH.exists():
+    if not EXTERNAL_DATABASE_URL and TEST_DB_PATH.exists():
         TEST_DB_PATH.unlink()
+
+    # Начинаем с чистого листа: важно и для внешней СУБД, где могли остаться
+    # таблицы от предыдущего запуска.
+    drop_db()
     init_db()
     with SessionLocal() as db:
         seed.ensure_default_users(db)
         seed.seed_demo_data(db)
     yield
     drop_db()
-    if TEST_DB_PATH.exists():
+    if not EXTERNAL_DATABASE_URL and TEST_DB_PATH.exists():
         TEST_DB_PATH.unlink()
 
 

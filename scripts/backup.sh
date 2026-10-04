@@ -27,8 +27,14 @@ STAND="${STAND_NAME:-local}"
 
 mkdir -p "${BACKUP_DIR}"
 
+case "${DATABASE_URL}" in
+    sqlite*) DB_LABEL="SQLite" ;;
+    postgresql*|postgres*) DB_LABEL="PostgreSQL" ;;
+    *) DB_LABEL="${DATABASE_URL%%:*}" ;;
+esac
+
 echo "==> Резервное копирование стенда ${STAND}"
-echo "    СУБД: ${DATABASE_URL%%:*}"
+echo "    СУБД: ${DB_LABEL}"
 
 case "${DATABASE_URL}" in
     sqlite*)

@@ -11,7 +11,9 @@ class TestHealth:
         assert payload["status"] == "ok"
         assert payload["stand"] == "TEST"
         assert payload["database"]["available"] is True
-        assert payload["database"]["dialect"] == "SQLite"
+        # Диалект зависит от того, на какой СУБД запущен прогон: набор тестов
+        # можно выполнять и на SQLite, и на PostgreSQL.
+        assert payload["database"]["dialect"] in {"SQLite", "PostgreSQL"}
         assert payload["version"] == "1.0.0"
 
     def test_health_does_not_require_login(self, anon) -> None:
