@@ -322,9 +322,18 @@ sudo systemctl stop skachki
 cd ~/horse-racing-devops && git pull
 sudo bash scripts/install-stand.sh test     # повторный запуск обновляет /opt и службу
 
-# резервная копия базы
+# резервная копия базы (ручной режим)
 sudo -u skachki bash scripts/backup.sh
+bash scripts/backup.sh --list                       # список копий
 ls -lh /opt/horse-racing-devops/backups/
+
+# восстановление базы из копии
+sudo -u skachki bash scripts/backup.sh --restore \
+      /opt/horse-racing-devops/backups/<файл>.gz
+
+# автоматическое копирование: таймер ставится вместе со стендом
+systemctl list-timers skachki-backup.timer
+sudo journalctl -u skachki-backup.service -n 20
 
 # параметры стенда и статистика
 cd /opt/horse-racing-devops
@@ -355,7 +364,7 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 
 ## Чеклист скриншотов для отчёта
 
-В отчёте 41 рисунок. Ниже указано, что снять для каждого из них и на какой машине.
+В отчёте 43 рисунка. Ниже указано, что снять для каждого из них и на какой машине.
 Снимайте по порядку — тогда нумерация совпадёт с порядком рисунков в отчёте.
 
 «macOS» — снимок экрана хостовой машины, «браузер» — страница приложения,
@@ -401,9 +410,11 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 | 36 | браузер | Главная страница стенда STAGE (`http://10.211.55.12:8080`) |
 | 37 | браузер | Главная страница стенда PROD (`http://10.211.55.13:8080`) |
 | 38 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh` и `ls -lh /opt/horse-racing-devops/backups/` |
-| 39 | STAGE | `sudo systemctl stop postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — `status: degraded` |
-| 40 | браузер | `http://10.211.55.12:8080/races` — страница 503 с объяснением |
-| 41 | STAGE | `sudo systemctl start postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — снова `status: ok` |
+| 39 | STAGE | `systemctl list-timers skachki-backup.timer` и `sudo journalctl -u skachki-backup.service -n 20` — автоматическое копирование по таймеру |
+| 40 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh --restore /opt/horse-racing-devops/backups/<файл>.gz` — восстановление базы из копии |
+| 41 | STAGE | `sudo systemctl stop postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — `status: degraded` |
+| 42 | браузер | `http://10.211.55.12:8080/races` — страница 503 с объяснением |
+| 43 | STAGE | `sudo systemctl start postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — снова `status: ok` |
 
 Рисунки 38–40 относятся к проверке поведения при отказе СУБД. Она не входит в
 обязательное задание, но показывает устойчивость стенда и хорошо смотрится при

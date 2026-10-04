@@ -70,6 +70,45 @@ jobs:
       - name: Тесты
         run: pytest -q
 
+      # Подсистема резервного копирования и восстановления (ТЗ) на PostgreSQL:
+      # проверяем полный цикл — копия, изменение данных, восстановление.
+      # Все команды Python однострочные: многострочный код внутри YAML-блока
+      # получил бы лишние отступы и не собрался бы.
+      - name: Резервное копирование и восстановление на PostgreSQL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+
+          count() {
+            python -c "import os, sqlalchemy as sa; print(sa.create_engine(os.environ['DATABASE_URL']).connect().execute(sa.text('SELECT COUNT(*) FROM horses')).scalar())"
+          }
+
+          echo "==> Схема и начальные данные"
+          python -m app.cli seed
+
+          BEFORE="$(count)"
+          echo "лошадей до копии: ${BEFORE}"
+
+          echo "==> Создание копии"
+          bash scripts/backup.sh
+          BACKUP_FILE="$(ls -t backups/*.gz | head -1)"
+          echo "копия: ${BACKUP_FILE}"
+
+          echo "==> Изменение данных"
+          python -c "from app import crud; from app.database import SessionLocal; db = SessionLocal(); crud.create_horse(db, name='Проверочная лошадь', sex='кобыла', age=4, owner_id=None); db.close()"
+          CHANGED="$(count)"
+          echo "лошадей после изменения: ${CHANGED}"
+          test "${CHANGED}" -gt "${BEFORE}"
+
+          echo "==> Восстановление из копии"
+          RESTART_SERVICE=0 bash scripts/backup.sh --restore "${BACKUP_FILE}"
+
+          AFTER="$(count)"
+          echo "лошадей после восстановления: ${AFTER}"
+          test "${AFTER}" -eq "${BEFORE}"
+          echo "Восстановление на PostgreSQL подтверждено."
+
   deploy-scripts:
     name: Самопроверка скриптов развёртывания
     runs-on: ubuntu-latest

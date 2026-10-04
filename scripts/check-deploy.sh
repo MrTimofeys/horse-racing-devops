@@ -192,6 +192,18 @@ esac
 
 check "служба зарегистрирована в systemd" "grep -q 'systemctl enable' '${SCRIPT_COPY}'"
 
+# --- Автоматическое резервное копирование (ТЗ: копирование автоматическое и ручное)
+BACKUP_SERVICE="${SERVICE_DIR}/${SERVICE_NAME}-backup.service"
+BACKUP_TIMER="${SERVICE_DIR}/${SERVICE_NAME}-backup.timer"
+check "создан юнит автоматического копирования" "[[ -f '${BACKUP_SERVICE}' ]]"
+check "создан таймер автоматического копирования" "[[ -f '${BACKUP_TIMER}' ]]"
+check "таймер запускает именно службу копирования" "grep -q '^Unit=${SERVICE_NAME}-backup.service$' '${BACKUP_TIMER}'"
+check "таймер срабатывает ежедневно" "grep -q '^OnCalendar=\\*-\\*-\\* 03:30:00$' '${BACKUP_TIMER}'"
+check "пропущенное копирование не теряется (Persistent)" "grep -q '^Persistent=true$' '${BACKUP_TIMER}'"
+check "служба копирования вызывает scripts/backup.sh" "grep -q 'scripts/backup.sh' '${BACKUP_SERVICE}'"
+check "копирование выполняется от имени ${APP_USER}" "grep -q '^User=${APP_USER}$' '${BACKUP_SERVICE}'"
+check "таймер включён в автозапуск" "grep -qE 'systemctl enable --now \"?\\\$\{?SERVICE_NAME\}?-backup\\.timer' '${SCRIPT_COPY}'"
+
 # --- Проверка реального запуска приложения ---------------------------------
 # Снимаем заглушки: дальше нужны настоящие curl и sleep.
 export PATH="${ORIGINAL_PATH}"
@@ -229,14 +241,66 @@ else
     check "вход под admin работает (303)" "[[ '${LOGIN_CODE}' == '303' ]]"
 
     echo
-    echo "--- Резервное копирование развёрнутого стенда ---"
+    echo "--- Резервное копирование и восстановление ---"
+    DB_FILE="${APP_DIR}/instance/skachki.db"
+    cat > "${WORK_DIR}/count_horses.py" <<'COUNT_PY'
+import sqlite3
+import sys
+
+try:
+    rows = sqlite3.connect(sys.argv[1]).execute("SELECT COUNT(*) FROM horses").fetchone()
+    print(rows[0])
+except Exception:
+    print(0)
+COUNT_PY
+    count_horses() { "${APP_DIR}/.venv/bin/python" "${WORK_DIR}/count_horses.py" "${DB_FILE}"; }
+
+    add_horse() {
+        (cd "${APP_DIR}" && "${APP_DIR}/.venv/bin/python" -c "
+from app import crud
+from app.database import SessionLocal
+with SessionLocal() as db:
+    crud.create_horse(db, name='Проверочная лошадь', sex='кобыла', age=4, owner_id=None)
+")
+    }
+
+    HORSES_BEFORE="$(count_horses)"
+
     if (cd "${APP_DIR}" && bash scripts/backup.sh > "${WORK_DIR}/backup.log" 2>&1); then
         check "scripts/backup.sh создал резервную копию" "ls '${APP_DIR}'/backups/*.gz"
-        BACKUP_FILE="$(ls "${APP_DIR}"/backups/*.gz 2>/dev/null | head -1)"
+        check "список копий выводится" \
+            "(cd '${APP_DIR}' && bash scripts/backup.sh --list | grep -q 'skachki-.*\.gz')"
+
+        BACKUP_FILE="$(ls -t "${APP_DIR}"/backups/*.gz 2>/dev/null | head -1)"
         if [[ -n "${BACKUP_FILE}" ]]; then
-            gunzip -c "${BACKUP_FILE}" > "${WORK_DIR}/restored.db" 2>/dev/null
-            check "копия восстанавливается и проходит integrity_check" \
-                "\"${APP_DIR}/.venv/bin/python\" -c \"import sqlite3,sys; sys.exit(0 if sqlite3.connect('${WORK_DIR}/restored.db').execute('PRAGMA integrity_check').fetchone()[0]=='ok' else 1)\""
+            # Меняем данные, затем восстанавливаемся из копии и убеждаемся,
+            # что вернулось прежнее состояние — это и есть проверка
+            # подсистемы восстановления, требуемой ТЗ.
+            add_horse >/dev/null 2>&1 || true
+            HORSES_CHANGED="$(count_horses)"
+            check "данные изменились перед восстановлением (${HORSES_BEFORE} → ${HORSES_CHANGED})" \
+                "[[ '${HORSES_CHANGED}' -gt '${HORSES_BEFORE}' ]]"
+
+            if (cd "${APP_DIR}" && RESTART_SERVICE=0 bash scripts/backup.sh --restore "${BACKUP_FILE}" \
+                    > "${WORK_DIR}/restore.log" 2>&1); then
+                check "scripts/backup.sh --restore восстанавливает копию" "true"
+                HORSES_AFTER="$(count_horses)"
+                check "после восстановления данные совпадают с копией (${HORSES_AFTER})" \
+                    "[[ '${HORSES_AFTER}' -eq '${HORSES_BEFORE}' ]]"
+            else
+                check "scripts/backup.sh --restore восстанавливает копию" "false"
+            fi
+
+            # Повреждённая копия не должна затирать рабочую базу.
+            echo "не база данных" | gzip > "${WORK_DIR}/broken.db.gz"
+            if (cd "${APP_DIR}" && RESTART_SERVICE=0 bash scripts/backup.sh --restore "${WORK_DIR}/broken.db.gz" \
+                    > "${WORK_DIR}/broken.log" 2>&1); then
+                check "повреждённая копия отклоняется" "false"
+            else
+                check "повреждённая копия отклоняется" "true"
+                check "рабочая база не пострадала от повреждённой копии" \
+                    "[[ \"\$(count_horses)\" -eq '${HORSES_BEFORE}' ]]"
+            fi
         fi
     else
         check "scripts/backup.sh создал резервную копию" "false"

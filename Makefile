@@ -16,7 +16,7 @@ HOST   ?= 127.0.0.1
 PORT   ?= 8080
 
 .PHONY: help venv install dev run test test-cov seed reset check stats info \
-        install-stand provision backup check-deploy check-stands clean
+        install-stand provision backup backup-list backup-restore check-deploy check-stands clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -64,6 +64,12 @@ install-stand:  ## развернуть стенд как службу systemd: 
 
 backup:  ## создать резервную копию базы данных
 	bash scripts/backup.sh
+
+backup-list:  ## показать список резервных копий
+	bash scripts/backup.sh --list
+
+backup-restore:  ## восстановить базу из копии: make backup-restore FILE=backups/xxx.gz
+	bash scripts/backup.sh --restore $(FILE)
 
 check-deploy:  ## проверить скрипты развёртывания без виртуальной машины: make check-deploy STAND=test
 	bash scripts/check-deploy.sh $(STAND)

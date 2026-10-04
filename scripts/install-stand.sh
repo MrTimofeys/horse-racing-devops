@@ -220,6 +220,57 @@ systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}"
 systemctl restart "${SERVICE_NAME}"
 
+# --- 7.1. Автоматическое резервное копирование ----------------------------
+# ТЗ (п. «Требования по сохранности информации при авариях») требует
+# возможности организации как автоматического, так и ручного резервного
+# копирования. Ручное — это scripts/backup.sh, автоматическое — таймер systemd.
+echo "==> Регистрация автоматического резервного копирования"
+cat > "${SERVICE_DIR}/${SERVICE_NAME}-backup.service" <<BACKUP_UNIT
+[Unit]
+Description=Резервное копирование БД АС «Скачки» (стенд ${STAND})
+Documentation=https://github.com/MrTimofeys/horse-racing-devops
+
+[Service]
+Type=oneshot
+User=${APP_USER}
+Group=${APP_USER}
+WorkingDirectory=${APP_DIR}
+EnvironmentFile=${APP_DIR}/.env
+Environment=APP_DIR=${APP_DIR}
+Environment=BACKUP_DIR=${APP_DIR}/backups
+ExecStart=/bin/bash ${APP_DIR}/scripts/backup.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${SERVICE_NAME}-backup
+
+# Ограничения безопасности службы
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+BACKUP_UNIT
+
+# Ежедневно в 03:30 и через 10 минут после включения машины, если момент
+# был пропущен. Persistent=true не даёт пропустить копирование, если машина
+# в назначенное время была выключена.
+cat > "${SERVICE_DIR}/${SERVICE_NAME}-backup.timer" <<TIMER_UNIT
+[Unit]
+Description=Ежедневное резервное копирование БД АС «Скачки» (стенд ${STAND})
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+OnBootSec=10min
+Persistent=true
+Unit=${SERVICE_NAME}-backup.service
+
+[Install]
+WantedBy=timers.target
+TIMER_UNIT
+
+systemctl daemon-reload
+systemctl enable --now "${SERVICE_NAME}-backup.timer" 2>/dev/null || \
+    echo "(таймер зарегистрирован; запустите: systemctl enable --now ${SERVICE_NAME}-backup.timer)"
+
 # --- 8. Проверка ----------------------------------------------------------
 echo "==> Ожидание запуска службы"
 for _ in $(seq 1 30); do
@@ -266,5 +317,10 @@ cat <<EOF
   sudo systemctl status ${SERVICE_NAME}
   sudo journalctl -u ${SERVICE_NAME} -f
   sudo systemctl restart ${SERVICE_NAME}
-  sudo bash scripts/backup.sh
+
+Резервное копирование:
+  sudo bash scripts/backup.sh                 # создать копию вручную
+  bash scripts/backup.sh --list               # список копий
+  sudo bash scripts/backup.sh --restore FILE  # восстановить из копии
+  systemctl list-timers ${SERVICE_NAME}-backup.timer   # автоматическое копирование
 EOF
