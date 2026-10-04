@@ -59,6 +59,32 @@ if [[ "${WITH_POSTGRES}" -eq 1 ]]; then
     printf '  psql   : %s\n' "$(psql --version)"
 fi
 
+# --- Совместимость версии Python -------------------------------------------
+# Проекту нужен Python 3.11+. Слишком новые версии (например, 3.14 в не-LTS
+# выпуске Ubuntu 26.04) могут не иметь готовых сборок части зависимостей —
+# предупреждаем сразу, а не на этапе pip install.
+PY_VERSION="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+PY_MAJOR="${PY_VERSION%%.*}"
+PY_MINOR="${PY_VERSION##*.}"
+
+echo
+if ((PY_MAJOR < 3 || (PY_MAJOR == 3 && PY_MINOR < 11))); then
+    echo "ВНИМАНИЕ: Python ${PY_VERSION} старше требуемого 3.11." >&2
+    echo "  Установите более новый интерпретатор или используйте Ubuntu 24.04 LTS." >&2
+elif ((PY_MAJOR == 3 && PY_MINOR >= 14)); then
+    echo "ВНИМАНИЕ: Python ${PY_VERSION} — очень новый выпуск."
+    echo "  Готовые сборки отдельных библиотек могут отсутствовать, и pip начнёт"
+    echo "  собирать их из исходников (libpq-dev и build-essential уже установлены)."
+    echo "  Если сборка окажется проблемной, используйте Ubuntu 24.04 LTS (Python 3.12)."
+else
+    echo "Версия Python ${PY_VERSION} совместима с проектом."
+fi
+
+# В части сборок модуль venv вынесен в отдельный пакет.
+if ! python3 -m venv --help >/dev/null 2>&1; then
+    echo "ВНИМАНИЕ: модуль venv недоступен. Установите пакет python${PY_VERSION}-venv." >&2
+fi
+
 echo
 echo "Готово. Дальше выполните:"
 echo "  git clone https://github.com/MrTimofeys/horse-racing-devops.git"
