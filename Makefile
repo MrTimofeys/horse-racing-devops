@@ -16,8 +16,7 @@ HOST   ?= 127.0.0.1
 PORT   ?= 8080
 
 .PHONY: help venv install dev run test test-cov seed reset check stats info \
-        install-stand provision backup backup-list backup-restore check-deploy check-stands \
-        check-performance clean
+        install-stand provision backup backup-list backup-restore check-deploy check-stands clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -77,9 +76,6 @@ check-deploy:  ## проверить скрипты развёртывания �
 
 check-stands:  ## проверить связность стендов TEST/STAGE/PROD по сети
 	bash scripts/check-stands.sh
-
-check-performance:  ## проверить показатели назначения: make check-performance URL=http://10.211.55.11:8080
-	bash scripts/check-performance.sh $(URL)
 
 clean:  ## удалить временные файлы и кеши
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

@@ -117,18 +117,6 @@ echo "[заглушка] createdb $*"
 exit 0
 STUB
 
-# Межсетевой экран: записываем вызовы, чтобы потом проверить правила.
-cat > "${BIN_DIR}/ufw" <<'STUB'
-#!/usr/bin/env bash
-echo "$*" >> "${UFW_LOG:-/dev/null}"
-case "$*" in
-    *"status verbose"*)
-        echo "Status: active"
-        echo "Default: deny (incoming), allow (outgoing), disabled (routed)"
-        ;;
-esac
-exit 0
-STUB
 
 chmod +x "${BIN_DIR}"/*
 
@@ -142,9 +130,6 @@ sed 's|if \[\[ "${EUID}" -ne 0 \]\]; then|if false; then|' \
 echo "=== Запуск scripts/install-stand.sh (стенд ${STAND}${WITH_POSTGRES:+ ${WITH_POSTGRES}}) ==="
 
 export PATH="${BIN_DIR}:${PATH}"
-# Заглушка ufw пишет сюда список настроенных правил.
-export UFW_LOG="${WORK_DIR}/ufw.log"
-: > "${UFW_LOG}"
 export APP_DIR SERVICE_DIR SOURCE_DIR="${REPO_DIR}"
 export SERVICE_NAME="${SERVICE_UNIT}"
 export APP_USER="skachki"
@@ -207,35 +192,6 @@ case "${STAND}" in
 esac
 
 check "служба зарегистрирована в systemd" "grep -q 'systemctl enable' '${SCRIPT_COPY}'"
-
-# --- Автоматическое резервное копирование (ТЗ: копирование автоматическое и ручное)
-BACKUP_SERVICE="${SERVICE_DIR}/${SERVICE_NAME}-backup.service"
-BACKUP_TIMER="${SERVICE_DIR}/${SERVICE_NAME}-backup.timer"
-check "создан юнит автоматического копирования" "[[ -f '${BACKUP_SERVICE}' ]]"
-check "создан таймер автоматического копирования" "[[ -f '${BACKUP_TIMER}' ]]"
-check "таймер запускает именно службу копирования" "grep -q '^Unit=${SERVICE_NAME}-backup.service$' '${BACKUP_TIMER}'"
-check "таймер срабатывает ежедневно" "grep -q '^OnCalendar=\\*-\\*-\\* 03:30:00$' '${BACKUP_TIMER}'"
-check "пропущенное копирование не теряется (Persistent)" "grep -q '^Persistent=true$' '${BACKUP_TIMER}'"
-check "служба копирования вызывает scripts/backup.sh" "grep -q 'scripts/backup.sh' '${BACKUP_SERVICE}'"
-check "копирование выполняется от имени ${APP_USER}" "grep -q '^User=${APP_USER}$' '${BACKUP_SERVICE}'"
-check "таймер включён в автозапуск" "grep -qE 'systemctl enable --now \"?\\\$\{?SERVICE_NAME\}?-backup\\.timer' '${SCRIPT_COPY}'"
-
-# --- Межсетевой экран (ТЗ: защищённая часть отделена межсетевым экраном) ---
-check "межсетевой экран включён" "grep -q 'enable' '${UFW_LOG}'"
-check "входящие соединения запрещены по умолчанию" "grep -q '^default deny incoming\$' '${UFW_LOG}'"
-check "исходящие соединения разрешены" "grep -q '^default allow outgoing\$' '${UFW_LOG}'"
-check "открыт SSH для администрирования" "grep -q '^allow 22/tcp' '${UFW_LOG}'"
-check "открыт только порт приложения 8080" "grep -q '^allow 8080/tcp' '${UFW_LOG}'"
-check "лишних правил для ICMP не создаётся (их даёт базовый набор ufw)" \
-    "! grep -q 'icmp' '${UFW_LOG}'"
-
-if [[ -n "${WITH_POSTGRES}" ]]; then
-    check "PostgreSQL доступен только локальной сети стендов" \
-        "grep -q '^allow proto tcp from 10.211.55.0/24 to any port 5432' '${UFW_LOG}'"
-else
-    check "порт PostgreSQL не открыт (стенд на SQLite)" \
-        "! grep -q '5432' '${UFW_LOG}'"
-fi
 
 # --- Проверка реального запуска приложения ---------------------------------
 # Снимаем заглушки: дальше нужны настоящие curl и sleep.

@@ -24,8 +24,6 @@ APP_DIR="${APP_DIR:-/opt/horse-racing-devops}"
 SERVICE_DIR="${SERVICE_DIR:-/etc/systemd/system}"
 DB_NAME="${DB_NAME:-skachki}"
 DB_USER="${DB_USER:-skachki}"
-# Локальная сеть стендов — источник, которому разрешено подключаться к PostgreSQL.
-STAND_NETWORK="${STAND_NETWORK:-10.211.55.0/24}"
 
 STAND=""
 PORT=""
@@ -186,50 +184,6 @@ else
     tail -n 2 "${INIT_LOG}" | sed 's/^/      /'
 fi
 
-# --- 6.1. Межсетевой экран -------------------------------------------------
-# ТЗ (п. «Требования к защите информации от НСД»): защищённая часть системы
-# должна быть отделена от незащищённой части межсетевым экраном. Открывается
-# только необходимое: SSH для администрирования и порт самого приложения.
-# Порт PostgreSQL доступен лишь адресам локальной сети стендов, а не всем.
-echo "==> Настройка межсетевого экрана"
-if command -v ufw >/dev/null 2>&1; then
-    # Каждое правило добавляется отдельно: сбой одного правила не должен
-    # срывать развёртывание стенда, но о нём сообщается в выводе.
-    ufw_rule() {
-        if ! ufw "$@" >/dev/null 2>&1; then
-            echo "    ВНИМАНИЕ: не удалось применить правило ufw $*"
-        fi
-    }
-
-    ufw --force reset >/dev/null 2>&1 || true
-
-    if ufw default deny incoming >/dev/null 2>&1; then
-        echo "    входящие соединения запрещены по умолчанию"
-    else
-        echo "    ВНИМАНИЕ: не удалось задать политику по умолчанию"
-    fi
-    ufw default allow outgoing >/dev/null 2>&1 || true
-
-    # Протокол указывается до адреса — таков порядок аргументов в ufw.
-    ufw_rule allow 22/tcp comment 'SSH'
-    ufw_rule allow "${PORT}/tcp" comment 'АС Скачки'
-    # Отдельное правило для ICMP не создаётся намеренно. Базовые правила ufw
-    # (/etc/ufw/before.rules) уже принимают echo-request до правил пользователя,
-    # поэтому проверка связности (scripts/check-stands.sh) продолжает работать
-    # при включённой защите. Практическая проверка этого — в сборочном конвейере.
-    if [[ ${USE_POSTGRES} -eq 1 ]]; then
-        ufw_rule allow proto tcp from "${STAND_NETWORK}" to any port 5432 \
-            comment 'PostgreSQL для стендов'
-    fi
-
-    # Включаем защиту последней: правило для SSH уже создано, поэтому доступ
-    # к стенду не теряется.
-    ufw --force enable >/dev/null 2>&1 || echo "    ВНИМАНИЕ: не удалось включить ufw"
-    ufw status verbose || true
-else
-    echo "    (ufw не установлен — установите пакет ufw и повторите развёртывание)"
-fi
-
 # --- 7. Служба systemd ----------------------------------------------------
 echo "==> Регистрация службы ${SERVICE_NAME}.service"
 cat > "${SERVICE_DIR}/${SERVICE_NAME}.service" <<UNIT
@@ -265,57 +219,6 @@ UNIT
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}"
 systemctl restart "${SERVICE_NAME}"
-
-# --- 7.1. Автоматическое резервное копирование ----------------------------
-# ТЗ (п. «Требования по сохранности информации при авариях») требует
-# возможности организации как автоматического, так и ручного резервного
-# копирования. Ручное — это scripts/backup.sh, автоматическое — таймер systemd.
-echo "==> Регистрация автоматического резервного копирования"
-cat > "${SERVICE_DIR}/${SERVICE_NAME}-backup.service" <<BACKUP_UNIT
-[Unit]
-Description=Резервное копирование БД АС «Скачки» (стенд ${STAND})
-Documentation=https://github.com/MrTimofeys/horse-racing-devops
-
-[Service]
-Type=oneshot
-User=${APP_USER}
-Group=${APP_USER}
-WorkingDirectory=${APP_DIR}
-EnvironmentFile=${APP_DIR}/.env
-Environment=APP_DIR=${APP_DIR}
-Environment=BACKUP_DIR=${APP_DIR}/backups
-ExecStart=/bin/bash ${APP_DIR}/scripts/backup.sh
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${SERVICE_NAME}-backup
-
-# Ограничения безопасности службы
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-BACKUP_UNIT
-
-# Ежедневно в 03:30 и через 10 минут после включения машины, если момент
-# был пропущен. Persistent=true не даёт пропустить копирование, если машина
-# в назначенное время была выключена.
-cat > "${SERVICE_DIR}/${SERVICE_NAME}-backup.timer" <<TIMER_UNIT
-[Unit]
-Description=Ежедневное резервное копирование БД АС «Скачки» (стенд ${STAND})
-
-[Timer]
-OnCalendar=*-*-* 03:30:00
-OnBootSec=10min
-Persistent=true
-Unit=${SERVICE_NAME}-backup.service
-
-[Install]
-WantedBy=timers.target
-TIMER_UNIT
-
-systemctl daemon-reload
-systemctl enable --now "${SERVICE_NAME}-backup.timer" 2>/dev/null || \
-    echo "(таймер зарегистрирован; запустите: systemctl enable --now ${SERVICE_NAME}-backup.timer)"
 
 # --- 8. Проверка ----------------------------------------------------------
 echo "==> Ожидание запуска службы"
@@ -368,5 +271,4 @@ cat <<EOF
   sudo bash scripts/backup.sh                 # создать копию вручную
   bash scripts/backup.sh --list               # список копий
   sudo bash scripts/backup.sh --restore FILE  # восстановить из копии
-  systemctl list-timers ${SERVICE_NAME}-backup.timer   # автоматическое копирование
 EOF
