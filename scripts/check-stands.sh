@@ -9,17 +9,18 @@
 #
 # Использование:
 #   bash scripts/check-stands.sh
-#   bash scripts/check-stands.sh 10.211.55.4 10.211.55.5 10.211.55.6
+#   bash scripts/check-stands.sh 10.211.55.11 10.211.55.12 10.211.55.13
 #
 # Если адреса не указаны, берутся значения по умолчанию из переменных
-# окружения TEST_HOST, STAGE_HOST, PROD_HOST.
+# окружения TEST_HOST, STAGE_HOST, PROD_HOST. Значения по умолчанию совпадают
+# с адресами из docs/DEPLOY_LR2.md: сеть Parallels Shared Network 10.211.55.0/24.
 #
 set -uo pipefail
 
 if [[ $# -ge 1 ]]; then
     HOSTS=("$@")
 else
-    HOSTS=("${TEST_HOST:-10.211.55.4}" "${STAGE_HOST:-10.211.55.5}" "${PROD_HOST:-10.211.55.6}")
+    HOSTS=("${TEST_HOST:-10.211.55.11}" "${STAGE_HOST:-10.211.55.12}" "${PROD_HOST:-10.211.55.13}")
 fi
 
 NAMES=(test stage prod)
