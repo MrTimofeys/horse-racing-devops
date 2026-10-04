@@ -478,6 +478,70 @@ def remove_participant(db: Session, result: RaceResult) -> None:
     db.commit()
 
 
+def list_results(
+    db: Session,
+    *,
+    search: str | None = None,
+    race_id: int | None = None,
+    hippodrome_id: int | None = None,
+    jockey_id: int | None = None,
+    horse_id: int | None = None,
+    only_finished: bool = True,
+    page: int = 1,
+    per_page: int = 20,
+) -> Page[RaceResult]:
+    """Сводный список результатов заездов.
+
+    ТЗ (п. «Базовая подсистема») требует навигации между разделами
+    «Состязания», «Жокеи», «Лошади», «Владельцы» и «Результаты». Здесь
+    собираются итоги заездов: занятые места и показанное время.
+
+    При ``only_finished`` в список попадают только участники с внесённым
+    результатом — заявленные, но не финишировавшие лошади не показываются.
+    """
+    stmt = (
+        select(RaceResult)
+        .join(RaceResult.race)
+        .options(
+            selectinload(RaceResult.race).selectinload(Race.hippodrome),
+            selectinload(RaceResult.horse),
+            selectinload(RaceResult.jockey),
+        )
+        # Сначала свежие состязания, внутри заезда — по занятым местам.
+        .order_by(Race.race_date.desc(), Race.race_time.desc(), RaceResult.place.is_(None), RaceResult.place)
+    )
+
+    if only_finished:
+        stmt = stmt.where(RaceResult.place.isnot(None))
+    if race_id:
+        stmt = stmt.where(RaceResult.race_id == race_id)
+    if hippodrome_id:
+        stmt = stmt.where(Race.hippodrome_id == hippodrome_id)
+    if jockey_id:
+        stmt = stmt.where(RaceResult.jockey_id == jockey_id)
+    if horse_id:
+        stmt = stmt.where(RaceResult.horse_id == horse_id)
+    if search:
+        # Поиск идёт по связанным таблицам, поэтому сначала соединения,
+        # и только потом условие с обращением к их столбцам.
+        needle = f"%{search.strip()}%"
+        stmt = (
+            stmt.join(RaceResult.horse)
+            .join(RaceResult.jockey)
+            .join(Race.hippodrome)
+            .where(
+                or_(
+                    Race.title.ilike(needle),
+                    Horse.name.ilike(needle),
+                    Jockey.name.ilike(needle),
+                    Hippodrome.name.ilike(needle),
+                )
+            )
+        )
+
+    return paginate(db, stmt, page=page, per_page=per_page)
+
+
 # ---------------------------------------------------------------------------
 # Сводка для главной страницы
 # ---------------------------------------------------------------------------

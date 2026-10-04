@@ -1,6 +1,6 @@
 """Маршруты (роутеры) приложения «Скачки»."""
 
-from . import api, auth, dashboard, hippodromes, horses, jockeys, owners, races, users
+from . import api, auth, dashboard, hippodromes, horses, jockeys, owners, races, results, users
 
 # Порядок подключения определяет порядок в документации OpenAPI.
 all_routers = [
@@ -11,6 +11,7 @@ all_routers = [
     jockeys.router,
     hippodromes.router,
     races.router,
+    results.router,
     users.router,
     api.router,
 ]

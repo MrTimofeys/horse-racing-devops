@@ -48,18 +48,36 @@ engine = create_engine(
 )
 
 
-@event.listens_for(Engine, "connect")
-def _set_sqlite_pragma(dbapi_connection, connection_record) -> None:  # noqa: ANN001
-    """Включить контроль внешних ключей в SQLite.
+def _sqlite_lower(value):  # noqa: ANN001, ANN201
+    return value.lower() if isinstance(value, str) else value
 
-    Без этого SQLite молча игнорирует ON DELETE CASCADE и ссылочную целостность,
-    а ТЗ требует обеспечения целостности данных средствами СУБД.
+
+def _sqlite_upper(value):  # noqa: ANN001, ANN201
+    return value.upper() if isinstance(value, str) else value
+
+
+@event.listens_for(Engine, "connect")
+def _configure_sqlite(dbapi_connection, connection_record) -> None:  # noqa: ANN001
+    """Настроить соединение SQLite.
+
+    Во-первых, включить контроль внешних ключей: без этого SQLite молча
+    игнорирует ON DELETE CASCADE и ссылочную целостность, а ТЗ требует
+    обеспечения целостности данных средствами СУБД.
+
+    Во-вторых, заменить встроенные функции ``lower`` и ``upper`` на версии
+    Python. Встроенные функции SQLite обрабатывают только латиницу: запрос
+    ``lower('Иванов')`` возвращает ``'Иванов'``. Из-за этого поиск без учёта
+    регистра по русскому тексту на SQLite не работает, тогда как в PostgreSQL
+    функции зависят от языка и работают правильно. Стенд TEST вёл бы себя иначе,
+    чем STAGE и PROD, поэтому функции переопределяются.
     """
     if not settings.is_sqlite:
         return
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+    dbapi_connection.create_function("lower", 1, _sqlite_lower, deterministic=True)
+    dbapi_connection.create_function("upper", 1, _sqlite_upper, deterministic=True)
 
 
 class Base(DeclarativeBase):

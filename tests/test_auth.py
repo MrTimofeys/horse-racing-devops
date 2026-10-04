@@ -5,7 +5,7 @@ from __future__ import annotations
 
 class TestAuthentication:
     def test_anonymous_redirected_to_login(self, anon) -> None:
-        for path in ("/dashboard", "/races", "/horses", "/jockeys", "/owners", "/hippodromes"):
+        for path in ("/dashboard", "/races", "/horses", "/jockeys", "/owners", "/results", "/hippodromes"):
             response = anon.get(path, follow_redirects=False)
             assert response.status_code == 303, path
             assert response.headers["location"] == "/login", path
@@ -53,7 +53,7 @@ class TestRolePermissions:
     """Разграничение доступа на уровне задач (ТЗ)."""
 
     def test_viewer_can_read(self, viewer) -> None:
-        for path in ("/dashboard", "/races", "/horses", "/jockeys", "/owners", "/hippodromes"):
+        for path in ("/dashboard", "/races", "/horses", "/jockeys", "/owners", "/results", "/hippodromes"):
             assert viewer.get(path).status_code == 200, path
 
     def test_viewer_cannot_open_creation_forms(self, viewer) -> None:

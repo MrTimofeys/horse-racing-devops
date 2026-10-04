@@ -248,6 +248,18 @@ textarea.field__input { resize: vertical; }
 .filters .field__input { min-width: 200px; }
 .filters .field__input--select { min-width: 180px; }
 
+/* Флажок внутри панели фильтров (например, «показать заявленных»). */
+.filters__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted, #555);
+  cursor: pointer;
+  user-select: none;
+}
+.filters__check input { width: 16px; height: 16px; cursor: pointer; }
+
 .result-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .inline-form { display: inline; margin: 0; }
 
