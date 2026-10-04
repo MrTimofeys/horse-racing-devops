@@ -41,7 +41,8 @@ apt-get install -y -qq \
     git curl ca-certificates \
     build-essential pkg-config libpq-dev \
     rsync sqlite3 unzip \
-    net-tools iputils-ping
+    net-tools iputils-ping \
+    ufw
 
 if [[ "${WITH_POSTGRES}" -eq 1 ]]; then
     echo "==> Установка PostgreSQL"

@@ -335,6 +335,12 @@ sudo -u skachki bash scripts/backup.sh --restore \
 systemctl list-timers skachki-backup.timer
 sudo journalctl -u skachki-backup.service -n 20
 
+# межсетевой экран: настраивается автоматически при развёртывании
+sudo ufw status verbose
+
+# показатели назначения: 10 одновременных пользователей, отклик не более 3 с
+bash scripts/check-performance.sh http://10.211.55.11:8080
+
 # параметры стенда и статистика
 cd /opt/horse-racing-devops
 sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli info'
@@ -364,7 +370,7 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 
 ## Чеклист скриншотов для отчёта
 
-В отчёте 43 рисунка. Ниже указано, что снять для каждого из них и на какой машине.
+В отчёте 45 рисунков. Ниже указано, что снять для каждого из них и на какой машине.
 Снимайте по порядку — тогда нумерация совпадёт с порядком рисунков в отчёте.
 
 «macOS» — снимок экрана хостовой машины, «браузер» — страница приложения,
@@ -397,24 +403,25 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 | 23 | PROD | `curl -s http://127.0.0.1:8080/api/health \| python3 -m json.tool` |
 | 24 | STAGE или PROD | `curl -s http://10.211.55.11:8080/api/health` — обращение к стенду TEST с другой машины |
 | 25 | TEST | `cd /opt/horse-racing-devops && sudo -u skachki ./.venv/bin/python -m pytest -q` |
-| 26 | браузер | `http://10.211.55.11:8080/login` — страница входа |
-| 27 | браузер | Главная страница стенда TEST под `admin` (видно имя стенда) |
-| 28 | браузер | `http://10.211.55.11:8080/races` — список состязаний с фильтрами |
-| 29 | браузер | `http://10.211.55.11:8080/results` — раздел «Результаты»: итоги всех заездов |
-| 30 | браузер | Карточка состязания: состав заезда, места и показанное время |
-| 31 | браузер | Форма добавления нового состязания |
-| 32 | браузер | Внесение результата заезда |
-| 33 | браузер | Карточка жокея с историей участия |
-| 34 | браузер | Карточка лошади с историей участия |
-| 35 | браузер | Вход под `viewer`: кнопки изменения данных недоступны |
-| 36 | браузер | Главная страница стенда STAGE (`http://10.211.55.12:8080`) |
-| 37 | браузер | Главная страница стенда PROD (`http://10.211.55.13:8080`) |
-| 38 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh` и `ls -lh /opt/horse-racing-devops/backups/` |
-| 39 | STAGE | `systemctl list-timers skachki-backup.timer` и `sudo journalctl -u skachki-backup.service -n 20` — автоматическое копирование по таймеру |
-| 40 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh --restore /opt/horse-racing-devops/backups/<файл>.gz` — восстановление базы из копии |
-| 41 | STAGE | `sudo systemctl stop postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — `status: degraded` |
-| 42 | браузер | `http://10.211.55.12:8080/races` — страница 503 с объяснением |
-| 43 | STAGE | `sudo systemctl start postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — снова `status: ok` |
+| 26 | STAGE | `sudo ufw status verbose` и `sudo ufw status numbered` — правила межсетевого экрана |
+| 27 | браузер | `http://10.211.55.11:8080/login` — страница входа |
+| 28 | браузер | Главная страница стенда TEST под `admin` (видно имя стенда) |
+| 29 | браузер | `http://10.211.55.11:8080/races` — список состязаний с фильтрами |
+| 30 | браузер | `http://10.211.55.11:8080/results` — раздел «Результаты»: итоги всех заездов |
+| 31 | браузер | Карточка состязания: состав заезда, места и показанное время |
+| 32 | браузер | Форма добавления нового состязания |
+| 33 | браузер | Внесение результата заезда |
+| 34 | браузер | Карточка жокея с историей участия |
+| 35 | браузер | Карточка лошади с историей участия |
+| 36 | браузер | Вход под `viewer`: кнопки изменения данных недоступны |
+| 37 | браузер | Главная страница стенда STAGE (`http://10.211.55.12:8080`) |
+| 38 | браузер | Главная страница стенда PROD (`http://10.211.55.13:8080`) |
+| 39 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh` и `ls -lh /opt/horse-racing-devops/backups/` |
+| 40 | STAGE | `systemctl list-timers skachki-backup.timer` и `sudo journalctl -u skachki-backup.service -n 20` — автоматическое копирование по таймеру |
+| 41 | STAGE | `sudo bash /opt/horse-racing-devops/scripts/backup.sh --restore /opt/horse-racing-devops/backups/<файл>.gz` — восстановление базы из копии |
+| 42 | STAGE | `sudo systemctl stop postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — `status: degraded` |
+| 43 | браузер | `http://10.211.55.12:8080/races` — страница 503 с объяснением |
+| 44 | STAGE | `sudo systemctl start postgresql`, затем `curl -s http://127.0.0.1:8080/api/health` — снова `status: ok` |
 
 Рисунки 38–40 относятся к проверке поведения при отказе СУБД. Она не входит в
 обязательное задание, но показывает устойчивость стенда и хорошо смотрится при
@@ -424,6 +431,7 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 > Перед снимком 25 скопируйте в отчёт вывод тестов целиком: строка вида
 > `152 passed` — доказательство, что функции ТЗ работают.
 
+| 45 | PROD | `bash scripts/check-performance.sh http://10.211.55.13:8080` — 10 пользователей, время отклика |
 ---
 
 ## Вопросы для защиты

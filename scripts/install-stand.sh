@@ -24,6 +24,8 @@ APP_DIR="${APP_DIR:-/opt/horse-racing-devops}"
 SERVICE_DIR="${SERVICE_DIR:-/etc/systemd/system}"
 DB_NAME="${DB_NAME:-skachki}"
 DB_USER="${DB_USER:-skachki}"
+# Локальная сеть стендов — источник, которому разрешено подключаться к PostgreSQL.
+STAND_NETWORK="${STAND_NETWORK:-10.211.55.0/24}"
 
 STAND=""
 PORT=""
@@ -182,6 +184,31 @@ else
     DATABASE_PREPARED=0
     echo "    ВНИМАНИЕ: не удалось подготовить базу данных."
     tail -n 2 "${INIT_LOG}" | sed 's/^/      /'
+fi
+
+# --- 6.1. Межсетевой экран -------------------------------------------------
+# ТЗ (п. «Требования к защите информации от НСД»): защищённая часть системы
+# должна быть отделена от незащищённой части межсетевым экраном. Открывается
+# только необходимое: SSH для администрирования и порт самого приложения.
+# Порт PostgreSQL доступен лишь адресам локальной сети стендов, а не всем.
+echo "==> Настройка межсетевого экрана"
+if command -v ufw >/dev/null 2>&1; then
+    ufw --force reset >/dev/null 2>&1 || true
+    ufw default deny incoming >/dev/null
+    ufw default allow outgoing >/dev/null
+    ufw allow 22/tcp comment 'SSH' >/dev/null
+    ufw allow "${PORT}/tcp" comment 'АС Скачки' >/dev/null
+    # ICMP разрешаем только между стендами: от него зависит проверка связности
+    # (scripts/check-stands.sh), но открывать его всему миру не нужно.
+    ufw allow from "${STAND_NETWORK}" to any proto icmp comment 'ping между стендами' >/dev/null
+    if [[ ${USE_POSTGRES} -eq 1 ]]; then
+        ufw allow from "${STAND_NETWORK}" to any port 5432 proto tcp \
+            comment 'PostgreSQL для стендов' >/dev/null
+    fi
+    ufw --force enable >/dev/null 2>&1 || true
+    ufw status verbose || true
+else
+    echo "    (ufw не установлен — установите пакет ufw и повторите развёртывание)"
 fi
 
 # --- 7. Служба systemd ----------------------------------------------------
