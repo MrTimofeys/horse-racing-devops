@@ -359,6 +359,7 @@ sudo -u skachki bash -c 'set -a; . ./.env; set +a; ./.venv/bin/python -m app.cli
 | 14 | Разграничение прав | Вид интерфейса под `admin`, `operator`, `viewer` |
 | 15 | Работа функций ТЗ | Добавление жокея, лошади, состязания и внесение результата |
 | 16 | Резервное копирование | `scripts/backup.sh` и список файлов в `backups/` |
+| 17 | Поведение при отказе СУБД (по желанию) | `sudo systemctl stop postgresql` → `curl /api/health` покажет `degraded`, страница отдаст `503`; затем `sudo systemctl start postgresql` и обновление страницы без перезапуска `skachki` |
 
 ---
 
