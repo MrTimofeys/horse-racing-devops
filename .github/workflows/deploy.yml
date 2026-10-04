@@ -25,6 +25,22 @@ jobs:
       - name: Служба systemd активна
         run: systemctl is-active skachki
 
+      # Проверяем, что включённая защита не сломала связность: базовые правила
+      # ufw должны принимать ICMP echo-request до пользовательских правил.
+      # Без этого проверка стендов «от всех ко всем» (check-stands.sh) не работает.
+      - name: Межсетевой экран пропускает ping
+        run: |
+          echo "--- политика ufw ---"
+          sudo ufw status verbose
+          echo "--- базовые правила для ICMP ---"
+          sudo grep -c 'icmp-type echo-request -j ACCEPT' /etc/ufw/before.rules
+          sudo grep -q 'icmp-type echo-request -j ACCEPT' /etc/ufw/before.rules
+          echo "ICMP echo-request разрешён базовыми правилами ufw."
+          echo "--- проверка прохождения ping ---"
+          ping -c 2 -W 3 127.0.0.1
+          sudo ufw status | grep -q '8080/tcp'
+          echo "Порт приложения открыт, защита включена."
+
       - name: Стенд отвечает
         run: |
           for i in $(seq 1 10); do

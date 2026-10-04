@@ -226,8 +226,8 @@ check "входящие соединения запрещены по умолч�
 check "исходящие соединения разрешены" "grep -q '^default allow outgoing\$' '${UFW_LOG}'"
 check "открыт SSH для администрирования" "grep -q '^allow 22/tcp' '${UFW_LOG}'"
 check "открыт только порт приложения 8080" "grep -q '^allow 8080/tcp' '${UFW_LOG}'"
-check "ping разрешён только между стендами" \
-    "grep -q '^allow proto icmp from 10.211.55.0/24' '${UFW_LOG}'"
+check "лишних правил для ICMP не создаётся (их даёт базовый набор ufw)" \
+    "! grep -q 'icmp' '${UFW_LOG}'"
 
 if [[ -n "${WITH_POSTGRES}" ]]; then
     check "PostgreSQL доступен только локальной сети стендов" \

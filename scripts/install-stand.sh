@@ -213,9 +213,10 @@ if command -v ufw >/dev/null 2>&1; then
     # Протокол указывается до адреса — таков порядок аргументов в ufw.
     ufw_rule allow 22/tcp comment 'SSH'
     ufw_rule allow "${PORT}/tcp" comment 'АС Скачки'
-    # ICMP разрешаем только между стендами: от него зависит проверка связности
-    # (scripts/check-stands.sh), но открывать его всему миру не нужно.
-    ufw_rule allow proto icmp from "${STAND_NETWORK}" comment 'ping между стендами'
+    # Отдельное правило для ICMP не создаётся намеренно. Базовые правила ufw
+    # (/etc/ufw/before.rules) уже принимают echo-request до правил пользователя,
+    # поэтому проверка связности (scripts/check-stands.sh) продолжает работать
+    # при включённой защите. Практическая проверка этого — в сборочном конвейере.
     if [[ ${USE_POSTGRES} -eq 1 ]]; then
         ufw_rule allow proto tcp from "${STAND_NETWORK}" to any port 5432 \
             comment 'PostgreSQL для стендов'
