@@ -4,22 +4,20 @@
 службы приложения. Стенд обязан подняться и внятно сообщить о проблеме, а не
 уходить в бесконечный перезапуск со стеком в журнале.
 
-Недоступность СУБД моделируется без внешнего сервера: движку SQLite указывается
-каталог вместо файла базы — попытка подключения даёт ``OperationalError``.
+Недоступность СУБД моделируется без внешнего сервера: создаётся обычный файл, и
+база указывается «внутри» него. Часть пути не является каталогом, поэтому SQLite
+не может открыть базу и драйвер сообщает ``OperationalError``. Такой способ не
+зависит от состояния файловой системы: каталога ``instance`` в репозитории нет,
+он создаётся при первом запуске приложения.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
 from app import database, main
-
-ROOT = Path(__file__).resolve().parent.parent
-RECOVERY_DB = ROOT / "instance" / "recovery_test.db"
 
 
 def _engine_for(url: str):
@@ -30,10 +28,17 @@ def _sessions_for(engine):
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
+def _url_inside_a_file(tmp_path) -> str:
+    """Строка подключения к базе «внутри» обычного файла — открыть её нельзя."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("обычный файл, а не каталог", encoding="utf-8")
+    return f"sqlite:///{blocker}/skachki.db"
+
+
 @pytest.fixture
-def unavailable_database(monkeypatch):
+def unavailable_database(monkeypatch, tmp_path):
     """Подменить текущую БД на недоступную."""
-    broken_engine = _engine_for("sqlite:///instance")  # каталог, а не файл
+    broken_engine = _engine_for(_url_inside_a_file(tmp_path))
     broken_sessions = _sessions_for(broken_engine)
 
     monkeypatch.setattr(database, "engine", broken_engine)
@@ -88,13 +93,16 @@ class TestDatabaseUnavailable:
 
 
 class TestDatabaseRecovery:
-    def test_schema_created_when_database_returns(self, unavailable_database, anon, monkeypatch) -> None:
+    def test_schema_created_when_database_returns(
+        self, unavailable_database, anon, monkeypatch, tmp_path
+    ) -> None:
         """СУБД поднялась позже приложения — схема создаётся без перезапуска службы."""
-        RECOVERY_DB.unlink(missing_ok=True)
+        recovery_db = tmp_path / "recovery_test.db"
+        recovery_db.unlink(missing_ok=True)
 
         assert anon.get("/api/health").json()["status"] == "degraded"
 
-        recovered_engine = _engine_for(f"sqlite:///{RECOVERY_DB}")
+        recovered_engine = _engine_for(f"sqlite:///{recovery_db}")
         recovered_sessions = _sessions_for(recovered_engine)
         monkeypatch.setattr(database, "engine", recovered_engine)
         monkeypatch.setattr(database, "SessionLocal", recovered_sessions)
@@ -118,4 +126,4 @@ class TestDatabaseRecovery:
                 assert crud.get_user_by_username(db, "admin") is not None
         finally:
             recovered_engine.dispose()
-            RECOVERY_DB.unlink(missing_ok=True)
+            recovery_db.unlink(missing_ok=True)
