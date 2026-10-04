@@ -84,11 +84,14 @@ jobs:
             python -c "import os, sqlalchemy as sa; print(sa.create_engine(os.environ['DATABASE_URL']).connect().execute(sa.text('SELECT COUNT(*) FROM horses')).scalar())"
           }
 
-          echo "==> Схема и начальные данные"
-          python -m app.cli seed
+          echo "==> Схема и демонстрационные данные"
+          python -m app.cli seed --demo
 
           BEFORE="$(count)"
           echo "лошадей до копии: ${BEFORE}"
+          # Восстановление имеет смысл проверять только на непустой базе:
+          # иначе проверялось бы лишь удаление добавленной записи.
+          test "${BEFORE}" -gt 0
 
           echo "==> Создание копии"
           bash scripts/backup.sh
