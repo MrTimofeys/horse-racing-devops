@@ -193,19 +193,37 @@ fi
 # Порт PostgreSQL доступен лишь адресам локальной сети стендов, а не всем.
 echo "==> Настройка межсетевого экрана"
 if command -v ufw >/dev/null 2>&1; then
+    # Каждое правило добавляется отдельно: сбой одного правила не должен
+    # срывать развёртывание стенда, но о нём сообщается в выводе.
+    ufw_rule() {
+        if ! ufw "$@" >/dev/null 2>&1; then
+            echo "    ВНИМАНИЕ: не удалось применить правило ufw $*"
+        fi
+    }
+
     ufw --force reset >/dev/null 2>&1 || true
-    ufw default deny incoming >/dev/null
-    ufw default allow outgoing >/dev/null
-    ufw allow 22/tcp comment 'SSH' >/dev/null
-    ufw allow "${PORT}/tcp" comment 'АС Скачки' >/dev/null
+
+    if ufw default deny incoming >/dev/null 2>&1; then
+        echo "    входящие соединения запрещены по умолчанию"
+    else
+        echo "    ВНИМАНИЕ: не удалось задать политику по умолчанию"
+    fi
+    ufw default allow outgoing >/dev/null 2>&1 || true
+
+    # Протокол указывается до адреса — таков порядок аргументов в ufw.
+    ufw_rule allow 22/tcp comment 'SSH'
+    ufw_rule allow "${PORT}/tcp" comment 'АС Скачки'
     # ICMP разрешаем только между стендами: от него зависит проверка связности
     # (scripts/check-stands.sh), но открывать его всему миру не нужно.
-    ufw allow from "${STAND_NETWORK}" to any proto icmp comment 'ping между стендами' >/dev/null
+    ufw_rule allow proto icmp from "${STAND_NETWORK}" comment 'ping между стендами'
     if [[ ${USE_POSTGRES} -eq 1 ]]; then
-        ufw allow from "${STAND_NETWORK}" to any port 5432 proto tcp \
-            comment 'PostgreSQL для стендов' >/dev/null
+        ufw_rule allow proto tcp from "${STAND_NETWORK}" to any port 5432 \
+            comment 'PostgreSQL для стендов'
     fi
-    ufw --force enable >/dev/null 2>&1 || true
+
+    # Включаем защиту последней: правило для SSH уже создано, поэтому доступ
+    # к стенду не теряется.
+    ufw --force enable >/dev/null 2>&1 || echo "    ВНИМАНИЕ: не удалось включить ufw"
     ufw status verbose || true
 else
     echo "    (ufw не установлен — установите пакет ufw и повторите развёртывание)"

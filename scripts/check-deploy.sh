@@ -227,11 +227,11 @@ check "исходящие соединения разрешены" "grep -q '^de
 check "открыт SSH для администрирования" "grep -q '^allow 22/tcp' '${UFW_LOG}'"
 check "открыт только порт приложения 8080" "grep -q '^allow 8080/tcp' '${UFW_LOG}'"
 check "ping разрешён только между стендами" \
-    "grep -q '^allow from 10.211.55.0/24 to any proto icmp' '${UFW_LOG}'"
+    "grep -q '^allow proto icmp from 10.211.55.0/24' '${UFW_LOG}'"
 
 if [[ -n "${WITH_POSTGRES}" ]]; then
     check "PostgreSQL доступен только локальной сети стендов" \
-        "grep -q '^allow from 10.211.55.0/24 to any port 5432' '${UFW_LOG}'"
+        "grep -q '^allow proto tcp from 10.211.55.0/24 to any port 5432' '${UFW_LOG}'"
 else
     check "порт PostgreSQL не открыт (стенд на SQLite)" \
         "! grep -q '5432' '${UFW_LOG}'"
