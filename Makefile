@@ -11,12 +11,11 @@
 PYTHON ?= python3
 VENV   ?= .venv
 BIN    := $(VENV)/bin
-STAND  ?= test
 HOST   ?= 127.0.0.1
 PORT   ?= 8080
 
 .PHONY: help venv install dev run test test-cov seed reset check stats info \
-        install-stand provision backup backup-list backup-restore check-deploy check-stands clean
+        backup backup-list backup-restore clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -56,12 +55,6 @@ stats:  ## показать количество записей
 info:  ## показать параметры текущего стенда
 	$(BIN)/python -m app.cli info
 
-provision:  ## установить системные пакеты (Ubuntu/Debian, нужен sudo)
-	sudo bash scripts/provision-ubuntu.sh
-
-install-stand:  ## развернуть стенд как службу systemd: make install-stand STAND=test
-	sudo bash scripts/install-stand.sh $(STAND)
-
 backup:  ## создать резервную копию базы данных
 	bash scripts/backup.sh
 
@@ -71,12 +64,6 @@ backup-list:  ## показать список резервных копий
 backup-restore:  ## восстановить базу из копии: make backup-restore FILE=backups/xxx.gz
 	bash scripts/backup.sh --restore $(FILE)
 
-check-deploy:  ## проверить скрипты развёртывания без виртуальной машины: make check-deploy STAND=test
-	bash scripts/check-deploy.sh $(STAND)
-
-check-stands:  ## проверить связность стендов TEST/STAGE/PROD по сети
-	bash scripts/check-stands.sh
-
 clean:  ## удалить временные файлы и кеши
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
-	rm -rf .pytest_cache .coverage htmlcov .deploy-selftest
+	rm -rf .pytest_cache .coverage htmlcov
